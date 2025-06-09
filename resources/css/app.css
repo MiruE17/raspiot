@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* Tailwind CSS layers */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Kustomisasi tambahan untuk Windmill Dashboard */
+.form-input,
+.form-textarea,
+.form-select {
+  @apply rounded-md shadow-sm border-gray-300 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50;
+}
+
+/* Untuk menyembunyikan elemen dengan Alpine.js sebelum diinisialisasi */
+[x-cloak] {
+  display: none !important;
+}
+
+/* Tabel styles */
+.table-auto th {
+  @apply px-4 py-3 text-xs font-semibold tracking-wide text-left text-gray-500 uppercase border-b dark:border-gray-700 bg-gray-50 dark:text-gray-400 dark:bg-gray-800;
+}
+
+.table-auto td {
+  @apply px-4 py-3 text-gray-700 dark:text-gray-400;
+}
+
+.table-auto tr {
+  @apply bg-white dark:bg-gray-800;
+}
+
+.table-auto tr:nth-child(even) {
+  @apply bg-gray-50 dark:bg-gray-700;
+}
+
+/* Button styles */
+.btn {
+  @apply px-4 py-2 text-sm font-medium leading-5 text-white transition-colors duration-150 bg-purple-600 border border-transparent rounded-lg active:bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1;
+}
+
+.btn-secondary {
+  @apply px-4 py-2 text-sm font-medium leading-5 text-gray-700 transition-colors duration-150 bg-white border border-gray-300 rounded-lg active:bg-transparent hover:border-gray-500 focus:border-gray-500 active:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1;
+}
+
+.btn-red {
+  @apply px-4 py-2 text-sm font-medium leading-5 text-white transition-colors duration-150 bg-red-600 border border-transparent rounded-lg active:bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1;
+}
+
+/* Layer untuk kustom utilities */
+@layer utilities {
+  /* Kompatibilitas untuk focus:shadow-outline-*  */
+  .focus\:shadow-outline-purple:focus {
+    @apply focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 focus:outline-none;
+  }
+  
+  .focus\:shadow-outline-gray:focus {
+    @apply focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 focus:outline-none;
+  }
+  
+  .focus\:shadow-outline-red:focus {
+    @apply focus:ring-2 focus:ring-red-500 focus:ring-offset-1 focus:outline-none;
+  }
+  
+  .focus\:shadow-outline-blue:focus {
+    @apply focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none;
+  }
+}
