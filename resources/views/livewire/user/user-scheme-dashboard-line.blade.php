@@ -14,7 +14,7 @@
             <div class="flex items-center gap-3">
                 <!-- Auto Refresh Controls -->
                 <div class="flex items-center gap-2">
-                    <label class="flex items-center">
+                    <label class="flex items-center mr-2">
                         <input 
                             type="checkbox" 
                             wire:model.live="autoRefresh"
@@ -38,15 +38,15 @@
                     @endif
                     
                     <!-- Manual Refresh Button -->
-                    <button wire:click="manualRefresh" 
-                            class="px-3 py-1 text-sm font-medium leading-5 text-white transition-colors duration-150 bg-green-600 border border-transparent rounded-lg hover:bg-green-700 focus:outline-none focus:shadow-outline-green">
+                    <button wire:click="manualRefresh" title="Click for Manual Refresh"
+                            class="px-3 ml-2 py-1 text-sm font-medium leading-5 text-white transition-colors duration-150 bg-green-600 border border-transparent rounded-lg hover:bg-green-700 focus:outline-none focus:shadow-outline-green">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
                     </button>
                 </div>
                 
-                <a href="{{ route('user.schemes') }}" class="px-4 py-2 text-sm font-medium leading-5 text-white transition-colors duration-150 bg-blue-600 border border-transparent rounded-lg active:bg-blue-600 hover:bg-blue-700 focus:outline-none focus:shadow-outline-blue">
+                <a href="{{ route('user.schemes') }}" class="px-4 py-2 ml-2 text-sm font-medium leading-5 text-white transition-colors duration-150 bg-blue-600 border border-transparent rounded-lg active:bg-blue-600 hover:bg-blue-700 focus:outline-none focus:shadow-outline-blue">
                     Back to Schemes
                 </a>
             </div>
@@ -55,22 +55,53 @@
     
     <!-- Status Indicator yang responsive -->
     <div class="px-4 py-3 mb-4 bg-white rounded-lg shadow-md dark:bg-gray-800">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 rounded-full {{ $autoRefresh ? 'bg-green-500 animate-pulse' : 'bg-gray-400' }}"></div>
-                    <span class="text-sm text-gray-600 dark:text-gray-400">
-                        {{ $autoRefresh ? 'Auto Refresh ON' : 'Auto Refresh OFF' }}
-                    </span>
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-4">
+                <!-- Keterangan Range, Agregasi, Jumlah Data -->
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                    @if($timeRange === 'custom')
+                        {{ \Carbon\Carbon::parse($dateFrom)->format('M d') }} - {{ \Carbon\Carbon::parse($dateTo)->format('M d, Y') }}
+                    @else
+                        @php
+                            $rangeText = match($timeRange) {
+                                '24h' => 'Last 24 hours',
+                                '7d' => 'Last 7 days', 
+                                '30d' => 'Last 30 days',
+                                'all' => 'All available data',
+                                default => 'Last 24 hours'
+                            };
+                        @endphp
+                        {{ $rangeText }}
+                        @if($timeRange === 'all')
+                            - {{ \Carbon\Carbon::parse($dateFrom)->format('M d, Y') }} to {{ \Carbon\Carbon::parse($dateTo)->format('M d, Y') }}
+                        @endif
+                    @endif
+
+                    @if($dataAggregation !== 'raw')
+                        | 
+                        @php
+                            $aggregationLabel = match($dataAggregation) {
+                                'hourly' => 'Hourly',
+                                'daily' => 'Daily',
+                                'weekly' => 'Weekly',
+                                'monthly' => 'Monthly',
+                                'quarterly' => 'Quarterly',
+                                default => ucfirst($dataAggregation)
+                            };
+                        @endphp
+                        {{ $aggregationLabel }} {{ strtoupper($aggregationFunction) }}
+                    @endif
+
+                    @if(count($processedData) > 0)
+                        | {{ count($processedData) }} {{ $dataAggregation === 'raw' ? 'records' : 'periods' }}
+                        @if($dataAggregation !== 'raw' && isset($processedData[0]['data_count']))
+                            | {{ collect($processedData)->sum('data_count') }} total records
+                        @endif
+                    @endif
                 </div>
-                @if($autoRefresh)
-                    <span class="text-sm text-green-600 dark:text-green-400">
-                        (Every {{ $refreshInterval }}s)
-                    </span>
-                @endif
             </div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">
-                Last updated: <span id="lastUpdated">{{ now()->format('H:i:s') }}</span>
+            <div class="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                (Last updated: <span id="lastUpdated">{{ now()->format('H:i:s') }})</span>
             </div>
         </div>
     </div>
@@ -151,54 +182,9 @@
                         </div>
                     @endif
                 </div>
-                
-                <!-- Indicator untuk menunjukkan range yang aktif -->
-                <div class="text-xs text-gray-500 dark:text-gray-400">
-                    @if($timeRange === 'custom')
-                        {{ \Carbon\Carbon::parse($dateFrom)->format('M d') }} - {{ \Carbon\Carbon::parse($dateTo)->format('M d, Y') }}
-                    @else
-                        @php
-                            $rangeText = match($timeRange) {
-                                '24h' => 'Last 24 hours',
-                                '7d' => 'Last 7 days', 
-                                '30d' => 'Last 30 days',
-                                'all' => 'All available data',
-                                default => 'Last 24 hours'
-                            };
-                        @endphp
-                        ({{ $rangeText }})
-                        @if($timeRange === 'all')
-                            - {{ \Carbon\Carbon::parse($dateFrom)->format('M d, Y') }} to {{ \Carbon\Carbon::parse($dateTo)->format('M d, Y') }}
-                        @endif
-                    @endif
-                    
-                    <!-- Tampilkan info agregasi dengan format yang lebih baik -->
-                    @if($dataAggregation !== 'raw')
-                        | 
-                        @php
-                            $aggregationLabel = match($dataAggregation) {
-                                'hourly' => 'Hourly',
-                                'daily' => 'Daily',
-                                'weekly' => 'Weekly',
-                                'monthly' => 'Monthly',
-                                'quarterly' => 'Quarterly',
-                                default => ucfirst($dataAggregation)
-                            };
-                        @endphp
-                        {{ $aggregationLabel }} {{ strtoupper($aggregationFunction) }}
-                    @endif
-                    
-                    <!-- Tampilkan jumlah data -->
-                    @if(count($processedData) > 0)
-                        | {{ count($processedData) }} {{ $dataAggregation === 'raw' ? 'records' : 'periods' }}
-                        @if($dataAggregation !== 'raw' && isset($processedData[0]['data_count']))
-                            ({{ collect($processedData)->sum('data_count') }} total records)
-                        @endif
-                    @endif
-                </div>
             </div>
         </div>
-        
+
         @if(empty($processedData))
             <div class="p-4 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 No data available for the selected time range.
@@ -288,7 +274,7 @@
                             <th class="px-4 py-3">Period</th>
                             <th class="px-4 py-3">Data Points</th>
                         @endif
-                        
+                        @php $sensorIdx = 0; @endphp
                         @foreach($scheme->sensors as $sensor)
                             @php
                                 $outputs = $sensor->num_of_outputs ?: 1;
@@ -317,7 +303,22 @@
                         @endif
                     </tr>
                 </thead>
-
+                @php
+                $sensorOutputTypes = [];
+                foreach ($scheme->sensors as $sensor) {
+                    $types = [];
+                    $validation = [];
+                    try {
+                        $validation = $sensor->validation_settings ? json_decode($sensor->validation_settings, true) : [];
+                    } catch (\Throwable $e) {
+                        $validation = [];
+                    }
+                    for ($i = 0; $i < ($sensor->num_of_outputs ?? 1); $i++) {
+                        $types[] = $validation[$i]['type'] ?? 'number';
+                    }
+                    $sensorOutputTypes[] = $types;
+                }
+                @endphp
                 <tbody class="bg-white divide-y dark:divide-gray-700 dark:bg-gray-800">
                     @if($dataAggregation !== 'raw' && !$showRawData)
                         {{-- Display aggregated data --}}
@@ -338,8 +339,7 @@
                                         // Find sensor data in aggregated data
                                         $sensorData = null;
                                         foreach ($data['sensors'] as $aggSensor) {
-                                            if ($aggSensor['id'] == $sensor->id && 
-                                                ($aggSensor['alias'] == $sensor->pivot->alias || $aggSensor['alias'] == null)) {
+                                            if ($aggSensor['id'] == $sensor->id) {
                                                 $sensorData = $aggSensor;
                                                 break;
                                             }
@@ -349,13 +349,14 @@
                                     @for($i = 0; $i < $outputs; $i++)
                                         @php
                                             $label = isset($outputLabels[$i]) ? trim($outputLabels[$i]) : "Value " . ($i + 1);
-                                            $value = $sensorData && isset($sensorData['values'][$label]) 
-                                                ? $sensorData['values'][$label] 
-                                                : '-';
-                                            
-                                            // Format the aggregated value to 2 decimal places
+                                            $type = $sensorOutputTypes[$sensorIdx][$i] ?? 'number';
+                                            $value = $sensorData && isset($sensorData['values'][$label]) ? $sensorData['values'][$label] : '-';
                                             if (is_numeric($value)) {
-                                                $value = number_format($value, 2);
+                                                if ($type === 'percentage') {
+                                                    $value = number_format($value * 100, 2) . '%';
+                                                } else {
+                                                    $value = number_format($value, 2);
+                                                }
                                             }
                                         @endphp
                                         <td class="px-4 py-3 text-sm">
@@ -384,7 +385,7 @@
                                 <td class="px-2 py-3 text-sm">
                                     {{ $data->created_at->format('Y-m-d H:i:s') }}
                                 </td>
-                                
+                                @php $sensorIdx = 0; @endphp
                                 @foreach($scheme->sensors as $sensor)
                                     @php
                                         $outputs = $sensor->num_of_outputs ?: 1;
@@ -399,9 +400,7 @@
                                         $sensorData = null;
                                         if (is_array($jsonData)) {
                                             foreach ($jsonData as $sensorJson) {
-                                                // Check both ID and alias to find the correct sensor instance
-                                                if (isset($sensorJson['id']) && $sensorJson['id'] == $sensor->id && 
-                                                    isset($sensorJson['alias']) && $sensorJson['alias'] == $sensor->pivot->alias) {
+                                                if (isset($sensorJson['id']) && $sensorJson['id'] == $sensor->id) {
                                                     $sensorData = $sensorJson;
                                                     break;
                                                 }
@@ -438,7 +437,18 @@
                                     
                                     @foreach($outputLabels as $i => $outputLabel)
                                         <td class="px-4 py-3 text-sm">
-                                            {{ $sensorValues[$outputLabel->label] ?? '-' }}
+                                            @php
+                                                $type = $sensorOutputTypes[$sensorIdx][$i] ?? 'number';
+                                                $value = $sensorValues[$outputLabel->label] ?? '-';
+                                                if (is_numeric($value)) {
+                                                    if ($type === 'percentage') {
+                                                        $value = number_format($value * 100, 2) . '%';
+                                                    } else {
+                                                        $value = number_format($value, 2);
+                                                    }
+                                                }
+                                            @endphp
+                                            {{ $value }}
                                         </td>
                                     @endforeach
                                 @endforeach
@@ -503,33 +513,6 @@
             '#1abc9c', '#f1c40f', '#e67e22', '#34495e', '#7f8c8d',
             '#16a085', '#d35400', '#c0392b', '#8e44ad', '#2980b9'
         ];
-
-        function optimizeDataForChart(processedData, maxPoints = 1000) {
-            if (processedData.length <= maxPoints) {
-                return processedData;
-            }
-            
-            console.log(`📊 Optimizing ${processedData.length} data points to ${maxPoints}`);
-            
-            const step = Math.ceil(processedData.length / maxPoints);
-            const optimized = [];
-            
-            // Selalu sertakan data pertama dan terakhir
-            optimized.push(processedData[0]);
-            
-            // Sample data dengan interval
-            for (let i = step; i < processedData.length - step; i += step) {
-                optimized.push(processedData[i]);
-            }
-            
-            // Selalu sertakan data terakhir
-            if (processedData.length > 1) {
-                optimized.push(processedData[processedData.length - 1]);
-            }
-            
-            console.log(`📈 Data optimized: ${processedData.length} → ${optimized.length} points`);
-            return optimized;
-        }
 
         document.addEventListener('livewire:initialized', function() {
             // Initialize last timestamp dari data awal
@@ -830,18 +813,45 @@
                 const scheme = currentScheme;
 
                 if (!processedData || processedData.length === 0) {
-                    console.log('ℹ️ No data available');
-                    numericContainer.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">No data available for selected time range</div>';
-                    return;
+                console.log('ℹ️ No data available');
+                // Tampilkan chart kosong dengan axis dan label "No data"
+                const emptyChartOptions = {
+                    backgroundColor: '#121418',
+                    title: {
+                        text: 'No data available for selected time range',
+                        left: 'center',
+                        top: 'middle',
+                        textStyle: {
+                            color: '#f8fafc',
+                            fontSize: 16,
+                            fontWeight: 'normal'
+                        }
+                    },
+                    xAxis: {
+                        type: 'category',
+                        data: [],
+                        axisLabel: { color: '#f8fafc' },
+                        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.3)' } }
+                    },
+                    yAxis: {
+                        type: 'value',
+                        axisLabel: { color: '#f8fafc' },
+                        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.3)' } }
+                    },
+                    series: []
+                };
+                if (!iotChartNumeric) {
+                    iotChartNumeric = echarts.init(numericContainer);
                 }
+                iotChartNumeric.clear();
+                iotChartNumeric.setOption(emptyChartOptions, true);
+                return;
+            }
 
-                // Optimize data for charting
-                const optimizedData = optimizeDataForChart(processedData, 1000);
-                
-                console.log('📊 Processing', optimizedData.length, 'data points for aggregation:', currentAggregationType, 'time range:', currentTimeRange);
+                console.log('📊 Processing', processedData.length, 'data points for aggregation:', currentAggregationType, 'time range:', currentTimeRange);
 
                 // Format dates based on current aggregation type and time range
-                const formattedDates = optimizedData.map(item => {
+                const formattedDates = processedData.map(item => {
                     const date = new Date(item.created_at);
                     
                     // For 24h range, always show detailed time format regardless of aggregation
@@ -1101,7 +1111,7 @@
                 };
 
                 let allSeries = [];
-                processSensorData(scheme, optimizedData, allSeries, shouldAnimate);
+                processSensorData(scheme, processedData, allSeries, shouldAnimate);
                 console.log(`Generated ${allSeries.length} total series with animation:`, shouldAnimate);
 
                 // Handle axis configuration berdasarkan preserveAxis flag
@@ -1222,11 +1232,7 @@
             });
         }
 
-        // PERBAIKAN: Function processSensorData untuk handle raw data dengan format baru
         function processSensorData(scheme, processedData, allSeries, shouldAnimate = false, isAggregationChange = false) {
-            // OPTIMASI: Gunakan data yang sudah dioptimasi untuk chart
-            const optimizedData = optimizeDataForChart(processedData, 1000);
-            
             let colorIndex = 0;
 
             scheme.sensors.forEach(sensor => {
@@ -1265,52 +1271,25 @@
                         outputValidation = validationSettings;
                     }
 
-                    const dataPoints = optimizedData.map(item => {
+                    const dataPoints = processedData.map(item => {
                         let value = null;
-                        
-                        if (currentAggregationType === 'raw') {
-                            if (Array.isArray(item.sensors)) {
-                                let sensorData = null;
-                                
-                                if (sensor.pivot && sensor.pivot.alias) {
-                                    sensorData = item.sensors.find(s =>
-                                        String(s.id) == String(sensor.id) && 
-                                        String(s.alias || '') == String(sensor.pivot.alias || '')
-                                    );
-                                }
-                                
-                                if (!sensorData) {
-                                    sensorData = item.sensors.find(s => String(s.id) == String(sensor.id));
-                                }
-                                
-                                if (sensorData && sensorData.values && typeof sensorData.values === 'object') {
-                                    if (sensorData.values[label] !== undefined && sensorData.values[label] !== null) {
-                                        value = parseFloat(sensorData.values[label]);
-                                        if (isNaN(value)) value = null;
-                                    }
-                                }
+                        if (Array.isArray(item.sensors)) {
+                            let sensorData = null;
+                            if (sensor.pivot && sensor.pivot.alias) {
+                                sensorData = item.sensors.find(s =>
+                                    String(s.id) == String(sensor.id) && String(s.alias || '') == String(sensor.pivot.alias || '')
+                                );
                             }
-                        } else {
-                            // Untuk aggregated data, tetap gunakan logika yang sudah ada
-                            if (Array.isArray(item.sensors)) {
-                                let sensorData = null;
-                                if (sensor.pivot && sensor.pivot.alias) {
-                                    sensorData = item.sensors.find(s =>
-                                        String(s.id) == String(sensor.id) && String(s.alias || '') == String(sensor.pivot.alias || '')
-                                    );
-                                }
-                                if (!sensorData) {
-                                    sensorData = item.sensors.find(s => String(s.id) == String(sensor.id));
-                                }
-                                if (sensorData && sensorData.values && typeof sensorData.values === 'object') {
-                                    if (sensorData.values[label] !== undefined && sensorData.values[label] !== null) {
-                                        value = parseFloat(sensorData.values[label]);
-                                        if (isNaN(value)) value = null;
-                                    }
+                            if (!sensorData) {
+                                sensorData = item.sensors.find(s => String(s.id) == String(sensor.id));
+                            }
+                            if (sensorData && sensorData.values && typeof sensorData.values === 'object') {
+                                if (sensorData.values[label] !== undefined && sensorData.values[label] !== null) {
+                                    value = parseFloat(sensorData.values[label]);
+                                    if (isNaN(value)) value = null;
                                 }
                             }
                         }
-                        
                         return value;
                     });
 
@@ -1320,17 +1299,18 @@
                     const isPercentage = outputValidation?.type?.toLowerCase() === 'percentage';
                     const color = colors[colorIndex % colors.length];
 
-                    // Enhanced animation config
+                    // ENHANCED ANIMATION CONFIG DENGAN DIFFERENT TYPES
                     const animationConfig = {
                         animation: shouldAnimate,
                         animationDuration: shouldAnimate ? (isAggregationChange ? 1000 : 800) : 0,
                         animationEasing: shouldAnimate ? (isAggregationChange ? 'elasticOut' : 'cubicOut') : 'linear',
                         animationDelay: shouldAnimate ? colorIndex * (isAggregationChange ? 200 : 100) : 0,
+                        // Per-point animation dengan timing yang berbeda
                         animationDurationUpdate: shouldAnimate ? (isAggregationChange ? 600 : 400) : 0,
                         animationEasingUpdate: shouldAnimate ? 'cubicInOut' : 'linear',
                         animationDelayUpdate: function (idx) {
                             if (!shouldAnimate) return 0;
-                            return isAggregationChange ? idx * 80 : idx * 40;
+                            return isAggregationChange ? idx * 80 : idx * 40; // Lebih lambat untuk aggregation change
                         }
                     };
 
@@ -1344,6 +1324,7 @@
                         itemStyle: { color },
                         lineStyle: { width: 2, color },
                         areaStyle: { opacity: 0.2, color },
+                        // Apply animation config
                         ...animationConfig,
                         sensorInfo: {
                             id: sensor.id,
@@ -1354,17 +1335,6 @@
                             validationType: outputValidation?.type
                         }
                     };
-
-                    // Debug logging untuk troubleshooting
-                    console.log(`📊 Series "${seriesName}":`, {
-                        aggregationType: currentAggregationType,
-                        originalDataPoints: processedData.length,
-                        optimizedDataPoints: dataPoints.length,
-                        validDataPoints: dataPoints.filter(v => v !== null).length,
-                        sensorId: sensor.id,
-                        sensorAlias: sensor.pivot?.alias,
-                        label: label
-                    });
 
                     allSeries.push(seriesConfig);
                     colorIndex++;

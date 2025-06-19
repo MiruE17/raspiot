@@ -72,6 +72,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/sensors', function () {
             return view('access.admin.admin-sensor-index');
         })->name('sensors.index');
+
+        // Admin scheme management
+       Route::get('/schemes', function () {
+        return view('access.user.user-schemes-index');
+    })->name('schemes.index');
     });
 
     // Export routes

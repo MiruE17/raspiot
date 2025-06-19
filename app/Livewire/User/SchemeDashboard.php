@@ -316,55 +316,6 @@ class SchemeDashboard extends Component
         ]);
     }
     
-    private function setTimeRangeFromSelection()
-    {
-        $now = Carbon::now();
-        
-        switch ($this->timeRange) {
-            case '24h':
-                $this->dateFrom = $now->copy()->subDay()->format('Y-m-d H:i:s');
-                $this->dateTo = $now->format('Y-m-d H:i:s');
-                break;
-                
-            case '7d':
-                $this->dateFrom = $now->copy()->subWeek()->format('Y-m-d H:i:s');
-                $this->dateTo = $now->format('Y-m-d H:i:s');
-                break;
-                
-            case '30d':
-                $this->dateFrom = $now->copy()->subMonth()->format('Y-m-d H:i:s');
-                $this->dateTo = $now->format('Y-m-d H:i:s');
-                break;
-                
-            case 'all':
-                $earliest = DataIot::where('scheme_id', $this->schemeId)->min('created_at');
-                $latest = DataIot::where('scheme_id', $this->schemeId)->max('created_at');
-                
-                $this->dateFrom = $earliest ? Carbon::parse($earliest)->format('Y-m-d H:i:s') : $now->copy()->subMonth()->format('Y-m-d H:i:s');
-                $this->dateTo = $latest ? Carbon::parse($latest)->format('Y-m-d H:i:s') : $now->format('Y-m-d H:i:s');
-                break;
-                
-            case 'custom':
-                if ($this->dateFrom && !str_contains($this->dateFrom, ':')) {
-                    $this->dateFrom = Carbon::parse($this->dateFrom)->startOfDay()->format('Y-m-d H:i:s');
-                }
-                if ($this->dateTo && !str_contains($this->dateTo, ':')) {
-                    $this->dateTo = Carbon::parse($this->dateTo)->endOfDay()->format('Y-m-d H:i:s');
-                }
-                break;
-                
-            default:
-                $this->dateFrom = $now->copy()->subDay()->format('Y-m-d H:i:s');
-                $this->dateTo = $now->format('Y-m-d H:i:s');
-        }
-        
-        \Log::info('Time range set', [
-            'timeRange' => $this->timeRange,
-            'dateFrom' => $this->dateFrom,
-            'dateTo' => $this->dateTo
-        ]);
-    }
-    
     public function updatedTimeRange()
     {
         // Time range change TIDAK boleh mengubah lastDataCount
@@ -672,125 +623,89 @@ class SchemeDashboard extends Component
     
     public function loadData()
     {
-        // PENTING: Set time range SEBELUM load data
-        $this->setTimeRangeFromSelection();
-    
         if ($this->dataAggregation === 'raw') {
             $this->loadRawData();
         } else {
             $this->loadAggregatedData();
         }
-        
-        $query = collect($this->dataAggregation === 'raw' ? $this->chartData : $this->processedData);
-        
-        if ($this->dataAggregation !== 'raw' && $this->showRawData) {
-            $query = collect($this->chartData);
-        }
-        
-        $this->paginatedData = new \Illuminate\Pagination\LengthAwarePaginator(
-            $query->forPage(\Livewire\Livewire::current()->getPage(), $this->perPage),
-            $query->count(),
-            $this->perPage,
-            \Livewire\Livewire::current()->getPage(),
-            ['path' => request()->url(), 'pageName' => 'page']
-        );
     }
     
     private function loadRawData()
     {
-        $limits = [
-            '24h' => 1000,
-            '7d' => 2000,
-            '30d' => 1500,
-            'all' => 2500
-        ];
+        // Determine limit based on time range
+        $limit = $this->timeRange === 'all' ? 1000 : 500; // Increase limit for "all" but still reasonable
         
-        $limit = $limits[$this->timeRange] ?? 1000;
+        $query = DataIot::where('scheme_id', $this->schemeId);
         
-        $query = DataIot::where('scheme_id', $this->schemeId)
-            ->select(['id', 'created_at', 'json_content', 'additional_content'])
-            ->whereBetween('created_at', [
-                Carbon::parse($this->dateFrom),
-                Carbon::parse($this->dateTo)
+        if ($this->timeRange === '24h') {
+            // For 24h, use exact datetime comparison
+            $query->whereBetween('created_at', [
+                $this->dateFrom, 
+                $this->dateTo
             ]);
-        
-        $totalCount = $query->count();
-        
-        if ($totalCount > $limit) {
-            $step = max(1, floor($totalCount / $limit));
-            \Log::info("Large dataset detected, using sampling", [
-                'total_count' => $totalCount,
-                'limit' => $limit,
-                'step' => $step
-            ]);
-            
-            $this->chartData = $query
-                ->orderBy('created_at')
-                ->get()
-                ->filter(function($item, $index) use ($step) {
-                    return $index % $step === 0;
-                })
-                ->take($limit)
-                ->values();
         } else {
-            $this->chartData = $query
-                ->orderBy('created_at')
-                ->limit($limit)
-                ->get();
+            // For other ranges, use end of day
+            $query->whereBetween('created_at', [
+                $this->dateFrom, 
+                Carbon::parse($this->dateTo)->endOfDay()
+            ]);
         }
         
+        // Get the data for chart (limited amount for performance)
+        $this->chartData = $query
+            ->orderBy('created_at')
+            ->limit($limit)
+            ->get();
+            
+        // Process the data for chart display
         $this->processedData = [];
         
         foreach ($this->chartData as $data) {
             try {
-                $jsonData = is_string($data->json_content) 
-                    ? json_decode($data->json_content, true) 
-                    : $data->json_content;
-                
-                if (!is_array($jsonData)) continue;
-                
+                $jsonData = $data->json_content;
+                if (is_string($jsonData)) {
+                    $jsonData = json_decode($jsonData, true);
+                }
+                if (!is_array($jsonData)) {
+                    continue;
+                }
                 $processedItem = [
                     'id' => $data->id,
                     'created_at' => $data->created_at->toISOString(),
-                    'sensors' => []
+                    'sensors' => [],
+                    'additional_content' => $data->additional_content
                 ];
-                
                 foreach ($jsonData as $sensorData) {
-                    if (!isset($sensorData['id']) || !isset($sensorData['values'])) continue;
-                    
                     $sensorValues = [];
-                    if (is_array($sensorData['values'])) {
+                    if (isset($sensorData['values']) && is_array($sensorData['values'])) {
                         foreach ($sensorData['values'] as $valueData) {
-                            if (isset($valueData['label']) && isset($valueData['value'])) {
-                                $sensorValues[$valueData['label']] = $valueData['value'];
-                            }
+                            $sensorValues[$valueData['label']] = $valueData['value'];
                         }
                     }
-                    
                     $processedItem['sensors'][] = [
-                        'id' => $sensorData['id'],
+                        'id' => $sensorData['id'] ?? null,
                         'name' => $sensorData['name'] ?? 'Unknown',
-                        'alias' => $sensorData['alias'] ?? null,
+                        // Perbaikan: simpan alias dari data, bukan dari pivot
+                        'alias' => $sensorData['alias'] ?? ($sensorData['pivot']['alias'] ?? null),
                         'values' => $sensorValues
                     ];
                 }
-                
                 $this->processedData[] = $processedItem;
-                
             } catch (\Exception $e) {
-                \Log::error('Error processing raw data item: ' . $e->getMessage());
-                continue;
+                Log::error('Error processing data: ' . $e->getMessage(), [
+                    'data_id' => $data->id,
+                    'content' => $data->json_content
+                ]);
             }
         }
         
-        \Log::info('Optimized raw data loading completed', [
+        \Log::info('Raw data loaded', [
             'timeRange' => $this->timeRange,
             'dateFrom' => $this->dateFrom,
             'dateTo' => $this->dateTo,
-            'totalInDb' => $totalCount,
             'chartData_count' => $this->chartData->count(),
             'processedData_count' => count($this->processedData),
-            'sampling_used' => $totalCount > $limit
+            'limit_applied' => $limit
         ]);
     }
     
@@ -1015,12 +930,14 @@ class SchemeDashboard extends Component
         $sensorGroups = [];
         foreach ($group['data_points'] as $point) {
             foreach ($point['sensors'] as $sensorData) {
-                $sensorKey = $sensorData['id'] . '_' . ($sensorData['alias'] ?? '');
+                $sensorId = $sensorData['id'] ?? null;
+                $sensorAlias = $sensorData['alias'] ?? ($sensorData['pivot']['alias'] ?? null);
+                $sensorKey = $sensorId . '_' . ($sensorAlias ?? '');
                 if (!isset($sensorGroups[$sensorKey])) {
                     $sensorGroups[$sensorKey] = [
-                        'id' => $sensorData['id'],
+                        'id' => $sensorId,
                         'name' => $sensorData['name'] ?? 'Unknown',
-                        'alias' => $sensorData['alias'] ?? null,
+                        'alias' => $sensorAlias,
                         'values' => []
                     ];
                 }
@@ -1054,7 +971,6 @@ class SchemeDashboard extends Component
             foreach ($sensorGroup['values'] as $label => $values) {
                 if (!empty($values)) {
                     $aggregatedValue = $this->applyAggregationFunction($values);
-                    // Round to 2 decimal places for better display
                     $aggregatedSensor['values'][$label] = round($aggregatedValue, 2);
                 }
             }
@@ -1227,31 +1143,26 @@ class SchemeDashboard extends Component
                     $csvRow = [
                         is_object($row) ? $row->created_at->format('Y-m-d H:i:s') : $row['created_at'],
                     ];
-                    
-                    // Process the data
                     $jsonData = is_object($row) ? $row->json_content : $row['sensors'];
                     if (is_string($jsonData)) {
                         $jsonData = json_decode($jsonData, true);
                     }
-                    
-                    // Add sensor values
                     foreach ($this->scheme->sensors as $sensor) {
                         $outputs = $sensor->num_of_outputs ?: 1;
                         $outputLabels = explode(',', $sensor->output_labels ?? '');
-                        
-                        // Find sensor data
+                        // Perbaikan: cari sensor dengan id dan alias
                         $sensorData = null;
                         if (is_array($jsonData)) {
                             foreach ($jsonData as $sensorJson) {
-                                if (isset($sensorJson['id']) && $sensorJson['id'] == $sensor->id &&
-                                    isset($sensorJson['alias']) && $sensorJson['alias'] == $sensor->pivot->alias) {
+                                $jsonId = isset($sensorJson['id']) ? $sensorJson['id'] : null;
+                                $jsonAlias = $sensorJson['alias'] ?? ($sensorJson['pivot']['alias'] ?? null);
+                                $pivotAlias = $sensor->pivot->alias ?? null;
+                                if ($jsonId == $sensor->id && (string)$jsonAlias === (string)$pivotAlias) {
                                     $sensorData = $sensorJson;
                                     break;
                                 }
                             }
                         }
-                        
-                        // Add sensor values to row
                         if ($sensorData && isset($sensorData['values'])) {
                             for ($i = 0; $i < $outputs; $i++) {
                                 $label = isset($outputLabels[$i]) ? trim($outputLabels[$i]) : "Value " . ($i + 1);
@@ -1265,7 +1176,6 @@ class SchemeDashboard extends Component
                                 $csvRow[] = $value;
                             }
                         } else {
-                            // Add empty values if no data found
                             for ($i = 0; $i < $outputs; $i++) {
                                 $csvRow[] = '';
                             }
@@ -1286,20 +1196,21 @@ class SchemeDashboard extends Component
                         $outputs = $sensor->num_of_outputs ?: 1;
                         $outputLabels = explode(',', $sensor->output_labels ?? '');
                         
-                        // Find sensor data in aggregated data
+                        // Perbaikan: cari sensor dengan id dan alias
                         $sensorData = null;
                         foreach ($row['sensors'] as $aggSensor) {
-                            if ($aggSensor['id'] == $sensor->id) {
+                            $aggId = $aggSensor['id'] ?? null;
+                            $aggAlias = $aggSensor['alias'] ?? null;
+                            $pivotAlias = $sensor->pivot->alias ?? null;
+                            if ($aggId == $sensor->id && (string)$aggAlias === (string)$pivotAlias) {
                                 $sensorData = $aggSensor;
                                 break;
                             }
                         }
-                        
                         if ($sensorData && isset($sensorData['values'])) {
                             for ($i = 0; $i < $outputs; $i++) {
                                 $label = isset($outputLabels[$i]) ? trim($outputLabels[$i]) : "Value " . ($i + 1);
                                 $value = $sensorData['values'][$label] ?? '';
-                                // Format numbers to 2 decimal places if numeric
                                 if (is_numeric($value)) {
                                     $value = number_format($value, 2);
                                 }
@@ -1335,18 +1246,34 @@ class SchemeDashboard extends Component
     
     public function render()
     {
-        // Pastikan scheme data selalu fresh dengan relasi
-        $freshScheme = Scheme::with(['sensors' => function($query) {
-            $query->withPivot('alias', 'order')->orderBy('scheme_sensors.order');
-        }])->findOrFail($this->schemeId);
-        
-        return view('livewire.user.user-scheme-dashboard', [
-            'paginatedData' => $this->paginatedData,
-            'processedData' => $this->processedData,
-            'scheme' => $freshScheme,
-        ])
-        ->extends('layouts.windmill')
-        ->section('content');
+        $scheme = $this->scheme; // Pastikan $scheme sudah di-load
+
+        if ($scheme->visualization_type === 'bar') {
+            return view('livewire.user.user-scheme-dashboard-bar', [
+                'paginatedData' => $this->paginatedData,
+                'processedData' => $this->processedData,
+                'scheme' => $scheme,
+            ])
+            ->extends('layouts.windmill')
+            ->section('content');
+        } elseif ($scheme->visualization_type === 'none') {
+            return view('livewire.user.user-scheme-dashboard-none', [
+                'paginatedData' => $this->paginatedData,
+                'processedData' => $this->processedData,
+                'scheme' => $scheme,
+            ])
+            ->extends('layouts.windmill')
+            ->section('content');
+        } else {
+            // Default: line chart
+            return view('livewire.user.user-scheme-dashboard-line', [
+                'paginatedData' => $this->paginatedData,
+                'processedData' => $this->processedData,
+                'scheme' => $scheme,
+            ])
+            ->extends('layouts.windmill')
+            ->section('content');
+        }
     }
 
     public function updatedAutoRefresh()
@@ -1394,5 +1321,11 @@ class SchemeDashboard extends Component
         
         // Call the main refresh function dengan context manual
         $this->refreshData('manual');
+    }
+    
+    public function refreshBarChart($context = 'auto')
+    {
+        // Sama persis dengan refreshData, tapi hanya untuk bar chart
+        $this->refreshData($context);
     }
 }

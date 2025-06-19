@@ -36,6 +36,10 @@ class SchemeManager extends Component
     public $showDeleteModal = false;
     public $selectedScheme = null;
     
+    // Add these properties to the class
+    public $availableSensors = [];
+    public $selectedSensorDetails = [];
+    
     protected $listeners = ['refreshSchemes' => '$refresh'];
     
     protected function rules()
@@ -43,7 +47,7 @@ class SchemeManager extends Component
         return [
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'visualizationType' => ['required', Rule::in(['line', 'bar', 'scatter', 'pie', 'gauge', 'none'])],
+            'visualizationType' => ['required', Rule::in(['line', 'bar', 'none'])],
             'selectedSensors' => ['required', 'array', 'min:1'],
             'selectedSensors.*' => ['required', 'exists:sensors,id'],
             'sensorOrders.*' => ['integer', 'min:0'],
@@ -223,6 +227,7 @@ class SchemeManager extends Component
             'type' => 'success'
         ]);
     }
+
     
     public function confirmDelete($id)
     {
@@ -235,6 +240,89 @@ class SchemeManager extends Component
         $this->showDeleteModal = false;
         $this->schemeId = null;
     }
+
+    public function getSelectedSensorDetails($sensorIds)
+{
+    // Pastikan selalu array
+    if (!is_array($sensorIds)) {
+        $sensorIds = [$sensorIds];
+    }
+    $details = [];
+    foreach ($sensorIds as $index => $sensorId) {
+        $sensor = Sensor::find($sensorId);
+        if ($sensor) {
+            $details[] = [
+                'id' => $sensor->id,
+                'name' => $sensor->name,
+                'description' => $sensor->description,
+                'picture' => $sensor->picture,
+                'num_of_outputs' => $sensor->num_of_outputs,
+                'alias' => $this->sensorAliases[$index] ?? ''
+            ];
+        }
+    }
+    return $details;
+}
+
+public function sensorSelectorDoneFromModal()
+{
+    // Debug log untuk memastikan data
+    \Log::info('pendingSensors saat tombol Done diklik', ['pendingSensors' => $this->pendingSensors]);
+    
+    // Simpan dulu selectedSensorDetails
+    $currentDetails = $this->selectedSensorDetails;
+    
+    // Panggil updatePendingSensors dengan parameter yang sudah ada dalam komponen
+    $this->updatePendingSensors($this->pendingSensors);
+    
+    // Pastikan selectedSensors dan selectedSensorDetails sudah benar
+    // dengan memaksa re-render UI sebelum menutup modal
+    $this->dispatch('refresh-pending-sensors');
+    $this->dispatch('closeSensorModal');
+}
+
+public function updatePendingSensors($sensorIds)
+{
+    // Log sebelum proses
+    \Log::info('updatePendingSensors dipanggil dengan', ['sensorIds' => $sensorIds]);
+    
+    // Pastikan selalu array
+    if (!is_array($sensorIds)) {
+        $sensorIds = [$sensorIds];
+    }
+    
+    // Filter nilai null atau string kosong, lalu re-index array
+    $filteredIds = array_values(array_filter($sensorIds, fn($id) => $id !== null && $id !== ''));
+    
+    // Jika daftar sensor menjadi kosong, kembalikan ke state default
+    if (empty($filteredIds)) {
+        $this->pendingSensors = [null];
+        $this->sensorAliases = [''];
+        $this->selectedSensors = [];
+        $this->selectedSensorDetails = [];
+    } else {
+        // Jika ada sensor, update properti terkait
+        $this->pendingSensors = $filteredIds;
+        $this->selectedSensors = $filteredIds;
+        
+        // Sinkronkan panjang sensorAliases
+        $aliases = $this->sensorAliases;
+        $this->sensorAliases = [];
+        foreach ($filteredIds as $i => $sid) {
+            $this->sensorAliases[] = $aliases[$i] ?? '';
+        }
+
+        // Update detail sensor
+        $this->selectedSensorDetails = $this->getSelectedSensorDetails($filteredIds);
+    }
+    
+    // Log setelah proses untuk memastikan
+    \Log::info('Setelah update', [
+        'pendingSensors' => $this->pendingSensors, 
+        'selectedSensors' => $this->selectedSensors,
+        'selectedSensorDetails' => $this->selectedSensorDetails
+    ]);
+}
     
     public function delete()
     {
@@ -356,8 +444,100 @@ class SchemeManager extends Component
         if (empty($this->pendingSensors)) {
             $this->pendingSensors = [null];
         }
+        
+        // Load available sensors 
+        $this->loadAvailableSensors();
     }
+    
+    // Load available sensors for the modal
+    public function loadAvailableSensors()
+    {
+        $this->availableSensors = Sensor::where('deleted', false)
+            ->select('id', 'name', 'description', 'num_of_outputs', 'output_labels', 'picture')
+            ->orderBy('name')
+            ->get()
+            ->toArray();
+    }
+    
+    // Add a sensor to the selection
+   public function addSensorToSelection($sensorId)
+{
+    // Izinkan duplikat sensor
+    $this->pendingSensors[] = $sensorId;
+    $this->sensorAliases[] = ''; // Alias baru untuk setiap entri
 
+    $this->updateSelectedSensorDetails();
+}
+    
+    // Remove a sensor from the selection
+    public function removeSensorFromSelection($sensorId)
+    {
+        $index = array_search($sensorId, $this->pendingSensors);
+        if ($index !== false) {
+            unset($this->pendingSensors[$index]);
+            unset($this->sensorAliases[$index]);
+            
+            // Re-index arrays to avoid gaps
+            $this->pendingSensors = array_values($this->pendingSensors);
+            $this->sensorAliases = array_values($this->sensorAliases);
+            
+            // Update the selected sensor details for display
+            $this->updateSelectedSensorDetails();
+        }
+    }
+    
+    // Update the order of sensors when drag-and-drop is used
+    public function updateSensorOrder($orderedSensorIds)
+    {
+        $newPendingSensors = [];
+        $newSensorAliases = [];
+        
+        // Rearrange arrays based on the new order
+        foreach ($orderedSensorIds as $sensorId) {
+            $index = array_search($sensorId, $this->pendingSensors);
+            if ($index !== false) {
+                $newPendingSensors[] = $sensorId;
+                $newSensorAliases[] = $this->sensorAliases[$index] ?? '';
+            }
+        }
+        
+        $this->pendingSensors = $newPendingSensors;
+        $this->sensorAliases = $newSensorAliases;
+        
+        // Update the selected sensor details for display
+        $this->updateSelectedSensorDetails();
+    }
+    
+    // Update the selectedSensorDetails array for the right panel
+    public function updateSelectedSensorDetails()
+    {
+        $this->selectedSensorDetails = [];
+        
+        foreach ($this->pendingSensors as $index => $sensorId) {
+            $sensor = Sensor::find($sensorId);
+            if ($sensor) {
+                $this->selectedSensorDetails[] = [
+                    'id' => $sensor->id,
+                    'name' => $sensor->name,
+                    'description' => $sensor->description,
+                    'picture' => $sensor->picture,
+                    'num_of_outputs' => $sensor->num_of_outputs,
+                    'alias' => $this->sensorAliases[$index] ?? ''
+                ];
+            }
+        }
+    }
+    
+    // Open the sensor selection modal
+    public function openSensorSelectionModal()
+    {
+        // Update available and selected sensors before showing
+        $this->loadAvailableSensors();
+        $this->updateSelectedSensorDetails();
+        
+        $this->dispatch('openSensorModal');
+    }
+    
     public function render()
     {
         $schemes = Scheme::where('user_id', Auth::id())

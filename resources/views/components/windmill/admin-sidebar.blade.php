@@ -55,6 +55,15 @@
                     <span class="ml-4">API Tokens</span>
                 </a>
             </li>
+            <li class="relative px-6 py-3">
+                <span class="{{ request()->routeIs('admin.schemes*') || request()->routeIs('scheme.show') ? 'absolute inset-y-0 left-0 w-1 bg-blue-600 rounded-tr-lg rounded-br-lg' : '' }}" aria-hidden="true"></span>
+                <a href="{{ route('admin.schemes.index') }}" class="inline-flex items-center w-full text-sm font-semibold transition-colors duration-150 hover:text-gray-800 dark:hover:text-gray-200 {{ request()->routeIs('admin.schemes*') || request()->routeIs('scheme.show') ? 'text-gray-800 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400' }}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    <span class="ml-4">Schemes</span>
+                </a>
+            </li>
         </ul>
     </div>
 </aside>

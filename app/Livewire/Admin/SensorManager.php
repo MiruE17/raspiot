@@ -175,7 +175,9 @@ class SensorManager extends Component
         $sensors = Sensor::where('deleted', false)
             ->where(function ($query) {
                 $query->where('name', 'ilike', '%' . $this->search . '%')
-                      ->orWhere('description', 'like', '%' . $this->search . '%');
+                    ->orWhere('name', 'ilike', $this->search . '%')
+                    ->orWhere('name', 'ilike', '%' . $this->search)
+                      ->orWhere('description', 'ilike', '%' . $this->search . '%');
             })
             ->orderBy($this->sortField, $this->sortDirection)
             ->paginate($this->perPage);
@@ -314,11 +316,9 @@ class SensorManager extends Component
         if ($sensor->validation_settings) {
             $validationSettings = json_decode($sensor->validation_settings, true);
             foreach ($validationSettings as $index => $setting) {
-                if (isset($this->output_data_types[$index])) {
-                    $this->output_data_types[$index] = $setting['type'] ?? 'string';
-                    $this->output_min_values[$index] = $setting['min'] ?? null;
-                    $this->output_max_values[$index] = $setting['max'] ?? null;
-                }
+                $this->output_data_types[$index] = $setting['type'] ?? 'string';
+                $this->output_min_values[$index] = $setting['min'] ?? null;
+                $this->output_max_values[$index] = $setting['max'] ?? null;
             }
         }
         
@@ -343,6 +343,10 @@ class SensorManager extends Component
         $this->showDeleteModal = true;
     }
 
+    public function updatedSearch()
+    {
+        $this->resetPage();
+    }
     // Delete method stays mostly the same
     public function delete()
     {

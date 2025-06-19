@@ -16,7 +16,6 @@
                     aria-label="Search" 
                 />
             </div>
-            
             <button wire:click="create" class="whitespace-nowrap inline-flex items-center px-4 py-2 text-sm font-medium leading-5 text-white transition-colors duration-150 bg-blue-600 border border-transparent rounded-lg active:bg-blue-600 hover:bg-blue-700 focus:outline-none focus:shadow-outline-blue">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
@@ -24,7 +23,6 @@
                 Add
             </button>
         </div>
-        
         <!-- Schemes Table -->
         <div class="w-full overflow-hidden rounded-lg shadow-xs">
             <div class="w-full overflow-x-auto">
@@ -69,11 +67,11 @@
                                         } elseif ($scheme->visualization_type == 'bar') {
                                             $visStyle = 'background-color: #f3e8ff; color: #9333ea;';
                                         } elseif ($scheme->visualization_type == 'scatter') {
-                                            $visStyle = 'background-color: #fef08a; color: #ca8a04;'; // contoh hex yellow
+                                            $visStyle = 'background-color: #fef08a; color: #ca8a04;';
                                         } elseif ($scheme->visualization_type == 'pie') {
                                             $visStyle = 'background-color: #fecaca; color: #dc2626;';
                                         } elseif ($scheme->visualization_type == 'gauge') {
-                                            $visStyle = 'background-color: #c7d2fe; color: #4338ca;'; // contoh hex indigo
+                                            $visStyle = 'background-color: #c7d2fe; color: #4338ca;';
                                         } else {
                                             $visStyle = 'background-color: #f3f4f6; color: #6b7280;';
                                         }
@@ -82,7 +80,6 @@
                                         {{ ucfirst($scheme->visualization_type ?? 'line') }}
                                     </span>
                                 </td>
-                                <!-- Modified Columns Column (Combined with Sensors) -->
                                 <td class="px-4 py-3 text-sm">
                                     @php
                                         // Calculate number of sensor columns (outputs)
@@ -161,7 +158,7 @@
                                                     >
                                                         +{{ $totalItems - (2 - $remainingBadges) }} more
                                                     </span>
-                                                    
+                                                
                                                     <!-- Hover Popup -->
                                                     <div 
                                                         x-show="showMore" 
@@ -195,7 +192,7 @@
                                                                     </div>
                                                                 </div>
                                                             @endif
-                                                            
+                                                
                                                             <!-- Hidden Additional Columns -->
                                                             @if($additionalCount > 2 - min(2, $scheme->sensors()->count()))
                                                                 <div>
@@ -210,7 +207,7 @@
                                                                 </div>
                                                             @endif
                                                         </div>
-                                                        
+                                                
                                                         <!-- Arrow Pointer -->
                                                         <div class="absolute w-3 h-3 bg-white dark:bg-gray-800 border-r border-b border-gray-200 dark:border-gray-700 transform rotate-45" style="bottom: -7px; left: 50%; margin-left: -6px;"></div>
                                                     </div>
@@ -274,30 +271,94 @@
                     </tbody>
                 </table>
             </div>
-            
             <div class="px-4 py-3 bg-white border-t dark:bg-gray-800 dark:border-gray-700">
                 {{ $schemes->links() }}
             </div>
         </div>
     </div>
-    
-    <!-- Modal untuk form scheme -->
+
+    <!-- MODALS (inline, single Alpine x-data root) -->
     <div 
-        x-data="{ 
-            open: false,
+        x-data="{
+            open: @entangle('showModal').defer,
+            showSensorModal: false,
+            searchQuery: '',
             init() {
                 const that = this;
-                window.addEventListener('show-modal', function() {
-                    that.open = true;
+                window.addEventListener('show-modal', function() { that.open = true; });
+                window.addEventListener('hide-modal', function() { that.open = false; });
+                window.addEventListener('openSensorModal', () => {
+                    that.showSensorModal = true;
                 });
-                window.addEventListener('hide-modal', function() {
-                    that.open = false;
+                
+                // Tambahkan ini:
+                window.addEventListener('sensorSelectorDone', function(e) {
+                    // e.detail.selectedSensors berisi array sensor terpilih
+                    // Kirim ke Livewire agar pendingSensors diupdate
+                    if (window.Livewire && typeof window.Livewire.dispatch === 'function') {
+                        window.Livewire.dispatch('updatePendingSensors', e.detail.selectedSensors);
+                    }
                 });
+            },
+            initSortable() {
+                if (this.showSensorModal) {
+                    this.$nextTick(() => {
+                        const selectedList = document.getElementById('selected-sensors-list');
+                        if (selectedList) {
+                            // Destroy previous Sortable instance if exists
+                            if (selectedList._sortableInstance) {
+                                selectedList._sortableInstance.destroy();
+                            }
+                            
+                            const sortable = new Sortable(selectedList, {
+                                animation: 150,
+                                ghostClass: 'sortable-ghost',
+                                handle: '.drag-handle',
+                                onStart: function(evt) {
+                                    // Add visual feedback when drag starts
+                                    selectedList.classList.add('dragging');
+                                },
+                                onMove: function(evt) {
+                                    // Update badge numbers during drag
+                                    this.updateBadgeNumbers();
+                                }.bind(this),
+                                onEnd: function(evt) {
+                                    // Remove visual feedback and update final order
+                                    selectedList.classList.remove('dragging');
+                                    this.updateBadgeNumbers();
+                                    
+                                    // Send order update to Livewire
+                                    if (window.Livewire && typeof window.Livewire.dispatch === 'function') {
+                                        const sensorIds = Array.from(selectedList.children).map(el => el.dataset.sensorId);
+                                        window.Livewire.dispatch('updateSensorOrder', sensorIds);
+                                    }
+                                }.bind(this)
+                            });
+                            
+                            // Save instance for later destroy
+                            selectedList._sortableInstance = sortable;
+                        }
+                    });
+                }
+            },
+            
+            updateBadgeNumbers() {
+                const selectedList = document.getElementById('selected-sensors-list');
+                if (selectedList) {
+                    const items = selectedList.querySelectorAll('.sensor-item');
+                    items.forEach((item, index) => {
+                        const badge = item.querySelector('.order-badge');
+                        if (badge) {
+                            badge.textContent = index + 1;
+                        }
+                    });
+                }
             }
         }"
+        x-init="init(); $watch('showSensorModal', value => { if(value) { initSortable() } });"
         x-cloak
     >
-        <!-- Modal backdrop -->
+        <!-- Modal backdrop utama -->
         <div
             x-show="open"
             x-transition:enter="transition ease-out duration-150"
@@ -307,9 +368,10 @@
             x-transition:leave-start="opacity-100"
             x-transition:leave-end="opacity-0"
             class="fixed inset-0 z-30 flex items-end bg-black bg-opacity-50 sm:items-center sm:justify-center"
-            @click.self="open = false"
+            style="z-index: 30;"
+            @click.self="if (!showSensorModal) { open = false }"
         >
-            <!-- Modal -->
+            <!-- Modal utama -->
             <div
                 x-show="open"
                 x-transition:enter="transition ease-out duration-150"
@@ -318,8 +380,8 @@
                 x-transition:leave="transition ease-in duration-150"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0 transform translate-y-1/2"
-                @click.away="open = false"
-                @keydown.escape="open = false"
+                @click.away="if (!showSensorModal) { open = false }"
+                @keydown.escape.window="if (!showSensorModal) { open = false }"
                 class="w-full px-6 py-4 overflow-hidden bg-white rounded-t-lg dark:bg-gray-800 sm:rounded-lg sm:m-4 sm:max-w-xl"
             >
                 <!-- Modal header -->
@@ -338,7 +400,6 @@
                         </svg>
                     </button>
                 </header>
-                
                 <!-- Modal body -->
                 <div class="mt-4 mb-6 overflow-y-auto" style="max-height: 60vh;">
                     @if($viewMode && $selectedScheme)
@@ -561,242 +622,150 @@
                     <span class="text-xs text-amber-600 dark:text-amber-400 ml-2">(Cannot be modified after creation)</span>
                 @endif
             </label>
-            
-            <!-- Sensor Selection Section - Replace existing sensor dropdown -->
-@if(!$schemeId)
-    <!-- Tampilkan sensor selection hanya jika mode CREATE -->
-    <div class="space-y-4">
-        @foreach($pendingSensors as $index => $pendingSensorId)
-            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
-                <div class="flex items-start gap-4">
-                    <!-- Sensor Selection -->
-                    <div class="flex-grow">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
-                            Select Sensor {{ $index + 1 }}
-                        </label>
-                        
-                        <!-- Custom Sensor Selector with Images -->
-                        <div class="relative" x-data="{ 
-                            open: false, 
-                            selected: @entangle('pendingSensors.' . $index),
-                            sensors: @js($sensors),
-                            getSensorById(id) {
-                                return this.sensors.find(s => s.id == id) || null;
-                            },
-                            getSelectedSensor() {
-                                return this.getSensorById(this.selected);
-                            }
-                        }">
-                            <!-- Selected Display -->
-                            <div @click="open = !open" 
-                                 class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 transition-colors">
-                                <div x-show="!selected" class="text-gray-500 dark:text-gray-400">
-                                    Click to select a sensor...
-                                </div>
-                                <div x-show="selected" class="flex items-center gap-3">
-                                    <!-- Sensor Image -->
-                                    <div class="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-lg overflow-hidden flex-shrink-0">
-                                        <template x-if="getSelectedSensor()?.picture">
-                                            <img :src="'/storage/' + getSelectedSensor().picture" 
-                                                 :alt="getSelectedSensor()? getSelectedSensor().name : ''"
-                                                 class="w-full h-full object-cover">
-                                        </template>
-                                        <template x-if="!getSelectedSensor()?.picture">
-                                            <div class="w-full h-full flex items-center justify-center">
-                                                <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                                                </svg>
-                                            </div>
-                                        </template>
-                                    </div>
-                                    
-                                    <!-- Sensor Info -->
-                                    <div class="flex-grow min-w-0">
-                                        <div class="font-medium text-gray-900 dark:text-gray-100" x-text="getSelectedSensor()?.name"></div>
-                                        <div class="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                            <span x-text="getSelectedSensor()?.description || 'No description'"></span>
-                                        </div>
-                                        <div class="text-xs text-gray-400 dark:text-gray-500">
-                                            <span x-text="(getSelectedSensor()?.num_of_outputs || 1) + ' output(s)'"></span>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Dropdown Arrow -->
-                                    <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{'rotate-180': open}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                    </svg>
-                                </div>
+
+            @if(!$schemeId)
+                <div class="space-y-2">
+                    <!-- Selected sensors summary -->
+                    <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                        @php
+    if (!is_array($pendingSensors)) {
+        $pendingSensors = [$pendingSensors];
+    }
+@endphp
+                        @if(!empty(array_filter($pendingSensors)))
+                            <div class="mb-3">
+                                <span class="font-medium">{{ count(array_filter($pendingSensors)) }} sensors selected</span>
                             </div>
-                            
-                            <!-- Dropdown Options -->
-                            <div x-show="open" 
-                                 x-transition:enter="transition ease-out duration-100"
-                                 x-transition:enter-start="transform opacity-0 scale-95"
-                                 x-transition:enter-end="transform opacity-100 scale-100"
-                                 x-transition:leave="transition ease-in duration-75"
-                                 x-transition:leave-start="transform opacity-100 scale-100"
-                                 x-transition:leave-end="transform opacity-0 scale-95"
-                                 @click.away="open = false"
-                                 class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                                
-                                <!-- Clear Selection Option -->
-                                <div @click="selected = null; open = false" 
-                                     class="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-600">
-                                    <div class="text-gray-500 dark:text-gray-400 italic">Clear selection</div>
-                                </div>
-                                
-                                <!-- Sensor Options -->
-                                <template x-for="sensor in sensors" :key="sensor.id">
-                                    <div @click="selected = sensor.id; open = false; $wire.set('pendingSensors.{{ $index }}', sensor.id)" 
-                                         class="px-3 py-3 hover:bg-blue-50 dark:hover:bg-blue-900 cursor-pointer flex items-center gap-3"
-                                         :class="{'bg-blue-100 dark:bg-blue-800': selected == sensor.id}">
-                                        
-                                        <!-- Sensor Image -->
-                                        <div class="w-12 h-12 bg-gray-200 dark:bg-gray-600 rounded-lg overflow-hidden flex-shrink-0">
-                                            <template x-if="sensor.picture">
-                                                <img :src="'/storage/' + sensor.picture" 
-                                                     :alt="sensor.name"
-                                                     class="w-full h-full object-cover">
-                                            </template>
-                                            <template x-if="!sensor.picture">
-                                                <div class="w-full h-full flex items-center justify-center">
-                                                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                                                    </svg>
+                            <div class="space-y-2">
+                                @foreach($pendingSensors as $index => $sensorId)
+                                    @if($sensorId)
+                                        @php
+                                            $sensorInfo = $this->getSensorInfo($sensorId);
+                                        @endphp
+                                        @if($sensorInfo)
+                                        <div class="flex items-center justify-between bg-white dark:bg-gray-800 p-2 rounded-md">
+                                            <div class="flex items-center">
+                                                <!-- Order indicator -->
+                                                <div class="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 flex items-center justify-center mr-3">
+                                                    <span>{{ $index + 1 }}</span>
                                                 </div>
-                                            </template>
-                                        </div>
-                                        
-                                        <!-- Sensor Details -->
-                                        <div class="flex-grow min-w-0">
-                                            <div class="font-medium text-gray-900 dark:text-gray-100" x-text="sensor.name"></div>
-                                            <div class="text-sm text-gray-600 dark:text-gray-400 truncate" x-text="sensor.description || 'No description'"></div>
-                                            <div class="flex items-center gap-2 mt-1">
-                                                <span class="text-xs text-gray-500 dark:text-gray-400" x-text="(sensor.num_of_outputs || 1) + ' output(s)'"></span>
+                                                
+                                                <!-- Sensor image -->
+                                                <div class="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-lg overflow-hidden flex-shrink-0 mr-2">
+                                                    @if($sensorInfo['picture'])
+                                                        <img src="{{ asset('storage/' . $sensorInfo['picture']) }}" alt="{{ $sensorInfo['name'] }}" class="w-full h-full object-cover">
+                                                    @else
+                                                        <div class="w-full h-full flex items-center justify-center">
+                                                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                                            </svg>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                                
+                                                <div>
+                                                    <div class="font-medium text-gray-900 dark:text-gray-100">{{ $sensorInfo['name'] }}</div>
+                                                    <div class="text-xs text-gray-500 dark:text-gray-400">{{ $sensorInfo['num_of_outputs'] ?? 1 }} output(s)</div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="flex items-center gap-2">
+                                                <!-- Alias input -->
+                                                <input 
+                                                    type="text" 
+                                                    wire:model="sensorAliases.{{ $index }}" 
+                                                    placeholder="Alias (optional)" 
+                                                    class="px-2 py-1 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white w-32"
+                                                >
+                                                
+                                                <!-- Remove button -->
+                                                <button 
+                                                    wire:click="removePendingSensor({{ $index }})" 
+                                                    type="button" 
+                                                    class="p-1 text-red-600 rounded-full dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900" 
+                                                    title="Remove sensor"
+                                                >
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                    </svg>
+                                                </button>
                                             </div>
                                         </div>
-                                    </div>
-                                </template>
+                                        @endif
+                                    @endif
+                                @endforeach
                             </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Alias Input -->
-                    <div class="w-1/3">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-400 mb-2">
-                            Alias (Optional)
-                        </label>
-                        <input 
-                            wire:model.live="sensorAliases.{{ $index }}" 
-                            type="text" 
-                            placeholder="Custom name..." 
-                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-400 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-white"
-                        >
-                    </div>
-                    
-                    <!-- Remove Button -->
-                    @if(count($pendingSensors) > 1)
-                        <div class="flex items-end">
-                            <button 
-                                wire:click.prevent="removePendingSensor({{ $index }})"
-                                type="button"
-                                class="p-2 text-red-600 rounded-full dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900 focus:outline-none focus:shadow-outline-red"
-                                title="Remove sensor"
-                            >
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                </svg>
-                            </button>
-                        </div>
-                    @endif
-                </div>
-                
-                <!-- Output Labels Preview -->
-                <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600" x-data="{ 
-                    sensorId: @entangle('pendingSensors.' . $index),
-                    sensors: @js($sensors),
-                    getSensor() {
-                        return this.sensors.find(s => s.id == this.sensorId) || null;
-                    },
-                    getOutputLabels() {
-                        const sensor = this.getSensor();
-                        if (!sensor || !sensor.output_labels) return [];
-                        return sensor.output_labels.split(',').map(label => label.trim()).filter(label => label);
-                    }
-                }" x-show="sensorId">
-                    <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">Output columns for this sensor:</div>
-                    <div class="flex flex-wrap gap-1">
-                        <template x-for="(label, idx) in getOutputLabels()" :key="idx">
-                            <span class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs" x-text="label || `Value ${idx + 1}`"></span>
-                        </template>
-                    </div>
-                </div>
-            </div>
-        @endforeach
-    </div>
-    
-    <!-- Add Sensor Button -->
-    <div class="mt-4">
-        <button 
-            wire:click.prevent="addSensorDropdown" 
-            type="button"
-            class="inline-flex items-center px-4 py-2 text-sm font-medium leading-5 text-white transition-colors duration-150 bg-blue-600 border border-transparent rounded-lg active:bg-blue-600 hover:bg-blue-700 focus:outline-none focus:shadow-outline-blue"
-        >
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-            </svg>
-            Add Another Sensor
-        </button>
-    </div>
-@else
-    <!-- Display readonly sensors if mode EDIT - Enhanced with images -->
-    <div class="space-y-3">
-        @if($selectedScheme && $selectedScheme->sensors && $selectedScheme->sensors->count() > 0)
-            @foreach($selectedScheme->sensors as $sensor)
-                <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg flex items-center gap-3">
-                    <!-- Sensor Image -->
-                    <div class="w-12 h-12 bg-gray-200 dark:bg-gray-600 rounded-lg overflow-hidden flex-shrink-0">
-                        @if($sensor->picture)
-                            <img src="{{ asset('storage/' . $sensor->picture) }}" 
-                                 alt="{{ $sensor->name }}"
-                                 class="w-full h-full object-cover">
                         @else
-                            <div class="w-full h-full flex items-center justify-center">
-                                <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                                </svg>
-                            </div>
+                            <p class="text-gray-500 dark:text-gray-400">No sensors selected. Use the button below to select sensors.</p>
                         @endif
                     </div>
                     
-                    <!-- Sensor Info -->
-                    <div class="flex-grow">
-                        <div class="flex items-center gap-2">
-                            <span class="font-medium text-gray-900 dark:text-gray-100">{{ $sensor->name }}</span>
-                            @if($sensor->pivot->alias)
-                                <span class="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs">
-                                    {{ $sensor->pivot->alias }}
-                                </span>
-                            @endif
-                        </div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            {{ $sensor->description ?? 'No description' }}
-                        </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Order: #{{ $loop->index + 1 }} • {{ $sensor->num_of_outputs ?? 1 }} output(s)
-                        </div>
+                    <!-- Sensor selection button -->
+                    <button 
+                        type="button" 
+                        {{-- @click="showSensorModal = true" --}}
+                        @click="window.dispatchEvent(new Event('openSensorModal'))"
+                        class="inline-flex items-center px-4 py-2 text-sm font-medium leading-5 text-white transition-colors duration-150 bg-blue-600 border border-transparent rounded-lg active:bg-blue-600 hover:bg-blue-700 focus:outline-none focus:shadow-outline-blue"
+                    >
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        Select Sensors
+                    </button>
+                    
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        <span>The order of sensors determines how data values will be mapped during API submissions. You can set aliases for each sensor to make them easier to identify.</span>
                     </div>
                 </div>
-            @endforeach
-        @else
-            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center">
-                <span class="text-gray-500 dark:text-gray-400">No sensors assigned to this scheme.</span>
-            </div>
-        @endif
-    </div>
-@endif
+            @else
+                <!-- Display readonly sensors if mode EDIT - Enhanced with images -->
+                <div class="space-y-3">
+                    @if($selectedScheme && $selectedScheme->sensors && $selectedScheme->sensors->count() > 0)
+                        @foreach($selectedScheme->sensors as $sensor)
+                            <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg flex items-center gap-3">
+                                <!-- Sensor Image -->
+                                <div class="w-12 mr-2h-12 bg-gray-200 dark:bg-gray-600 rounded-lg overflow-hidden flex-shrink-0">
+                                    @if($sensor->picture)
+                                        <img src="{{ asset('storage/' . $sensor->picture) }}" 
+                                             alt="{{ $sensor->name }}"
+                                             class="w-full h-full object-cover">
+                                    @else
+                                        <div class="w-full h-full flex items-center justify-center">
+                                            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                            </svg>
+                                        </div>
+                                    @endif
+                                </div>
+                                
+                                <!-- Sensor Info -->
+                                <div class="flex-grow">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-medium text-gray-900 dark:text-gray-100">{{ $sensor->name }}</span>
+                                        @if($sensor->pivot->alias)
+                                            <span class="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs">
+                                                {{ $sensor->pivot->alias }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                        {{ $sensor->description ?? 'No description' }}
+                                    </div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Order: #{{ $loop->index + 1 }} • {{ $sensor->num_of_outputs ?? 1 }} output(s)
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    @else
+                        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center">
+                            <span class="text-gray-500 dark:text-gray-400">No sensors assigned to this scheme.</span>
+                        </div>
+                    @endif
+                </div>
+            @endif
 
-            @error('pendingSensors')
+            @error('selectedSensors')
                 <span class="text-xs text-red-600 dark:text-red-400 mt-2 block">{{ $message }}</span>
             @enderror
         </div>
@@ -812,7 +781,7 @@
             
             @if(!$schemeId)
                 <!-- Show editable additional columns only in CREATE mode -->
-                <div class="space-y-3">
+                <div class="space-y-2">
                     @foreach($additionalColumns as $index => $column)
                         <div class="flex gap-2 items-start mb-2" style="gap: 0.5rem;">
                             <div class="flex-1">
@@ -933,7 +902,7 @@
             
             @if(!$schemeId)
                 <!-- Show visualization options only in CREATE mode -->
-                <div class="flex space-x-3">
+                {{-- <div class="flex space-x-3">
                     <!-- Line Chart (timeseries) option -->
                     <label class="visualization-option flex-1">
                         <input type="radio" wire:model.live="visualizationType" value="line" class="peer sr-only">
@@ -956,14 +925,51 @@
                         </div>
                     </label>
                     
-                    <!-- Scatter Plot option -->
                     <label class="visualization-option flex-1">
-                        <input type="radio" wire:model.live="visualizationType" value="scatter" class="peer sr-only">
+                        <input type="radio" wire:model.live="visualizationType" value="none" class="peer sr-only">
                         <div class="flex flex-col items-center p-2 border-2 rounded-lg cursor-pointer peer-checked:border-blue-500 peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900 dark:peer-checked:border-blue-500 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900">
                             <svg class="w-6 h-6 mb-1 peer-checked:text-blue-600 dark:peer-checked:text-blue-400 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12a2 2 0 100-4 2 2 0 000 4zM18 8a2 2 0 100-4 2 2 0 000 4zM14 16a2 2 0 100-4 2 2 0 000 4zM10 18a2 2 0 100-4 2 2 0 000 4z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9h18M3 15h18M9 5v14M15 5v14"></path>
                             </svg>
-                            <span class="text-xs font-medium peer-checked:text-blue-600 dark:peer-checked:text-blue-400 text-gray-500 dark:text-gray-400">Scatter Plot</span>
+                            <span class="text-xs font-medium peer-checked:text-blue-600 dark:peer-checked:text-blue-400 text-gray-500 dark:text-gray-400">Table Only</span>
+                        </div>
+                    </label>
+                </div> --}}
+                                <div class="flex space-x-3">
+                    <label class="visualization-option flex-1 cursor-pointer">
+                        <input type="radio" wire:model.live="visualizationType" value="line" class="sr-only peer">
+                        <div class="flex flex-col items-center p-2 border-2 rounded-lg transition
+                            border-gray-200 dark:border-gray-700
+                            peer-checked:border-blue-500 peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900
+                            hover:bg-blue-50 dark:hover:bg-blue-900">
+                            <svg class="w-6 h-6 mb-1 text-gray-500 dark:text-gray-400 peer-checked:text-blue-600 dark:peer-checked:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4v16"></path>
+                            </svg>
+                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 peer-checked:text-blue-600 dark:peer-checked:text-blue-400">Line Chart</span>
+                        </div>
+                    </label>
+                    <label class="visualization-option flex-1 cursor-pointer">
+                        <input type="radio" wire:model.live="visualizationType" value="bar" class="sr-only peer">
+                        <div class="flex flex-col items-center p-2 border-2 rounded-lg transition
+                            border-gray-200 dark:border-gray-700
+                            peer-checked:border-purple-500 peer-checked:bg-purple-50 dark:peer-checked:bg-purple-900
+                            hover:bg-purple-50 dark:hover:bg-purple-900">
+                            <svg class="w-6 h-6 mb-1 text-gray-500 dark:text-gray-400 peer-checked:text-purple-600 dark:peer-checked:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 13v-1m4 1v-3m4 3V8M8 21l4-4 4 4M3 4h18M4 4v16"></path>
+                            </svg>
+                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 peer-checked:text-purple-600 dark:peer-checked:text-purple-400">Bar Chart</span>
+                        </div>
+                    </label>
+                    <label class="visualization-option flex-1 cursor-pointer">
+                        <input type="radio" wire:model.live="visualizationType" value="none" class="sr-only peer">
+                        <div class="flex flex-col items-center p-2 border-2 rounded-lg transition
+                            border-gray-200 dark:border-gray-700
+                            peer-checked:border-gray-500 peer-checked:bg-gray-100 dark:peer-checked:bg-gray-900
+                            hover:bg-gray-100 dark:hover:bg-gray-900">
+                            <svg class="w-6 h-6 mb-1 text-gray-500 dark:text-gray-400 peer-checked:text-gray-700 dark:peer-checked:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9h18M3 15h18M9 5v14M15 5v14"></path>
+                            </svg>
+                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 peer-checked:text-gray-700 dark:peer-checked:text-gray-200">Table Only</span>
                         </div>
                     </label>
                 </div>
@@ -1013,7 +1019,7 @@
                         </button>
                     @else
                         <button
-                            @click="open = false"
+                            @click="if (!showSensorModal) { open = false }"
                             class="w-full px-5 py-3 text-sm font-medium leading-5 text-gray-700 transition-colors duration-150 border border-gray-300 rounded-lg dark:text-gray-400 sm:px-4 sm:py-2 sm:w-auto active:bg-transparent hover:border-gray-500 focus:border-gray-500 active:text-gray-500 focus:outline-none focus:shadow-outline-gray"
                         >
                             Cancel
@@ -1029,9 +1035,8 @@
                 </footer>
             </div>
         </div>
-    </div>
 
-    <!-- Delete Confirmation Modal -->
+        <!-- Delete Confirmation Modal -->
     <div
         x-data="{ show: @entangle('showDeleteModal').live }"
         x-cloak
@@ -1109,33 +1114,185 @@
         </div>
     </div>
 
-    <!-- Style untuk x-cloak -->
-    <style>
-        [x-cloak] { display: none !important; }
-    
-        .visualization-option input[type="radio"] {
-            position: absolute;
-            opacity: 0;
-        }
+    <!-- Sensor Selection Modal: sekarang root Alpine sendiri -->
+<div
+    x-data="{ showSensorModal: false, searchQuery: '' }"
+    x-show="showSensorModal"
+    x-transition:enter="transition ease-out duration-150"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="transition ease-in duration-150"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0"
+    class="fixed inset-0 z-50 flex items-end bg-black bg-opacity-50 sm:items-center sm:justify-center"
+    style="z-index: 50;"
+    @click.self="showSensorModal = false"
+    x-init="
+        window.addEventListener('openSensorModal', () => { showSensorModal = true });
+        window.addEventListener('closeSensorModal', () => { showSensorModal = false });
+    "
+>
+    <div
+        x-show="showSensorModal"
+        x-transition:enter="transition ease-out duration-150"
+        x-transition:enter-start="opacity-0 transform translate-y-1/2"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0 transform translate-y-1/2"
+        @click.away="showSensorModal = false"
+        @keydown.escape.window.stop="showSensorModal = false"
+        class="w-full px-6 py-4 overflow-hidden bg-white rounded-t-lg dark:bg-gray-800 sm:rounded-lg sm:m-4 sm:max-w-xl"
+    >
+        <!-- Modal header -->
+        <header class="flex justify-between">
+            <h2 class="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                Select Sensors
+            </h2>
+            <button
+                @click="window.dispatchEvent(new Event('closeSensorModal'))"
+                class="inline-flex items-center justify-center w-6 h-6 text-gray-400 transition-colors duration-150 rounded hover:text-gray-700 dark:hover:text-gray-200"
+                aria-label="close"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </header>
+        <!-- Modal body -->
+        <div class="mt-4 mb-6 overflow-y-auto" style="max-height: 60vh;">
+            <!-- Left-Right Panel Layout -->
+            <div class="flex gap-4 h-full">
+                <!-- Left Panel - Available Sensors -->
+                <div class="w-1/2 flex flex-col">
+                    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Available Sensors
+                    </h3>
+                    
+                    <!-- Search Bar -->
+                    <div class="relative mb-2">
+                        <input
+                            x-model="searchQuery"
+                            type="text"
+                            placeholder="Search..."
+                            class="w-full pl-8 pr-2 py-1 text-sm text-gray-700 bg-gray-100 border-0 rounded-md dark:bg-gray-700 dark:text-gray-300"
+                        >
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-2">
+                            <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <!-- Available Sensors List -->
+                    <div class="flex-1 overflow-y-auto border rounded-md dark:border-gray-700 h-48">
+                        <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+                            <template x-for="sensor in $wire.availableSensors" :key="sensor.id">
+                                <li 
+                                    x-show="searchQuery === '' || sensor.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                    class="p-2 hover:bg-gray-50 dark:hover:bg-gray-700 flex justify-between items-center"
+                                >
+                                    <div class="flex items-center">
+                                        <!-- Sensor icon or image -->
+                                        <div class="h-8 w-8 rounded-md bg-gray-200 dark:bg-gray-700 flex items-center justify-center mr-2">
+                                            <template x-if="sensor.picture">
+                                                <img :src="'/storage/' + sensor.picture" :alt="sensor.name" class="h-full w-full object-contain rounded-md">
+                                            </template>
+                                            <template x-if="!sensor.picture">
+                                                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                                </svg>
+                                            </template>
+                                        </div>
+                                        
+                                        <!-- Sensor details -->
+                                        <div>
+                                            <h4 class="font-medium text-sm text-gray-900 dark:text-white" x-text="sensor.name"></h4>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400" x-text="sensor.num_of_outputs + ' output(s)'"></p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Add button -->
+                                    <button 
+                                        @click="$wire.addSensorToSelection(sensor.id)"
+                                        class="p-1 text-blue-600 rounded-full dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900"
+                                        title="Add sensor"
+                                    >
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                        </svg>
+                                    </button>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Right Panel - Selected Sensors -->
+                <div class="w-1/2 flex flex-col">
+                    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Selected Sensors
+                    </h3>
+                    
+                    <!-- Selected Sensors List (static, no drag) -->
+                    <div class="flex-1 overflow-y-auto border rounded-md dark:border-gray-700 h-48">
+                        <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+                            @foreach($selectedSensorDetails as $index => $sensor)
+                                <li class="p-2 bg-white dark:bg-gray-800 flex items-center sensor-item">
+                                    <!-- Static order badge -->
+                                    <div class="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center mr-2 text-xs font-medium flex-shrink-0">
+                                        {{ $index + 1 }}
+                                    </div>
+                                    
+                                    <!-- Sensor name -->
+                                    <div class="flex-1 min-w-0 mr-2">
+                                        <h4 class="font-medium text-sm text-gray-900 dark:text-white truncate">{{ $sensor['name'] }}</h4>
+                                    </div>
+                                    
+                                    <!-- Alias input -->
+                                    <input
+                                        wire:model="sensorAliases.{{ $index }}"
+                                        type="text"
+                                        placeholder="Alias"
+                                        class="px-2 py-1 w-20 text-xs rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white mr-2 flex-shrink-0"
+                                    >
+                                    
+                                    <!-- Remove button -->
+                                    <button 
+                                        wire:click="removeSensorFromSelection({{ $sensor['id'] }})"
+                                        type="button"
+                                        class="p-1 text-red-600 rounded-full dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900 flex-shrink-0"
+                                        title="Remove sensor"
+                                    >
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                    </button>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
         
-        .visualization-option input[type="radio"] + div {
-            height: 100%;
-            width: 100%;
-            transition: all 0.1s ease-in-out;
-        }
-        
-        .visualization-option input[type="radio"]:checked + div {
-            border-color: rgb(59, 130, 246);
-            background-color: rgba(59, 130, 246, 0.1);
-        }
-        
-        .visualization-option input[type="radio"]:focus + div {
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
-        }
-        
-        .dark .visualization-option input[type="radio"]:checked + div {
-            border-color: rgb(59, 130, 246);
-            background-color: rgba(59, 130, 246, 0.2);
-        }
-    </style>
+        <!-- Modal footer -->
+        <footer class="flex flex-col items-center justify-end px-6 py-3 -mx-6 -mb-4 space-y-4 sm:space-y-0 sm:space-x-6 sm:flex-row bg-gray-50 dark:bg-gray-800">
+            <button
+                wire:click="sensorSelectorDoneFromModal"
+                class="w-full px-5 py-3 text-sm font-medium leading-5 text-white transition-colors duration-150 bg-blue-600 border border-transparent rounded-lg sm:w-auto sm:px-4 sm:py-2 active:bg-blue-600 hover:bg-blue-700 focus:outline-none focus:shadow-outline-blue"
+            >
+                Done
+            </button>
+        </footer>
+    </div>
 </div>
+        
+</div>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+<style>
+
+
+</style>
+</div>
+
