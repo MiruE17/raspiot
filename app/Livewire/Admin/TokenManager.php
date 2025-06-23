@@ -88,6 +88,17 @@ class TokenManager extends Component
     public function createToken()
     {
         $this->validate();
+
+       $expiryDate = $this->expiryDate
+        ? \Carbon\Carbon::parse($this->expiryDate)->startOfDay()
+        : now()->addDay()->startOfDay();
+
+    // Validasi: tidak boleh lebih dari 1 tahun dari hari ini
+    $maxDate = now()->addYear()->startOfDay();
+    if ($expiryDate->gt($maxDate)) {
+        $this->addError('expiryDate', 'Expiry date cannot be more than 1 year from today.');
+        return;
+    }
         
         $plainToken = Str::random(64);
         $hashedToken = hash('sha256', $plainToken);
@@ -96,7 +107,7 @@ class TokenManager extends Component
             'user_id' => $this->userId,
             'create_uid' => Auth::id(), // Ubah creator_id menjadi create_uid sesuai nama kolom di database
             'token' => $hashedToken,
-            'expiry_date' => $this->expiryDate,
+            'expiry_date' => $expiryDate,
             'active' => true,
             'hit_count' => 0
         ]);

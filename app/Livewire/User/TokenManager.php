@@ -75,11 +75,21 @@ class TokenManager extends Component
     public function createToken()
     {
         $this->validate();
+
+         $expiryDate = $this->expiryDate
+            ? Carbon::parse($this->expiryDate)
+            : now()->addDay()->startOfDay();
+
+        if ($this->expiryDate) {
+        $maxDate = now()->addYear()->startOfDay();
+        $userDate = Carbon::parse($this->expiryDate)->startOfDay();
+        if ($userDate->gt($maxDate)) {
+            $this->addError('expiryDate', 'Expiry date cannot be more than 1 year from today.');
+            return;
+        }
+    }
         
         $userId = Auth::id();
-        
-        // Convert expiry date to proper format if provided
-        $expiryDate = $this->expiryDate ? Carbon::parse($this->expiryDate) : null;
         
         // Create the token
         list($token, $displayToken) = ApiToken::createToken($userId, $expiryDate);

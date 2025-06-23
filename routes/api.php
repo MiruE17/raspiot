@@ -21,3 +21,5 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 // Route untuk menerima data IoT (tidak menggunakan auth:sanctum)
 Route::post('/data', [DataIotApiController::class, 'store']);
+Route::get('/data', [DataIotApiController::class, 'index']);
+

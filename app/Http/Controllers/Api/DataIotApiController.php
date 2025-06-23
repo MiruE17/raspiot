@@ -21,14 +21,22 @@ class DataIotApiController extends Controller
      */
     public function store(Request $request)
     {
+        $apiKey = $request->bearerToken() ?: $request->api_key;
+
         // Validate incoming request
         $validator = Validator::make($request->all(), [
             'scheme_id' => 'required|exists:schemes,id',
-            'api_key' => 'required|string',
             'values' => 'required|string',
             'timestamp' => 'nullable|date',
             'additional_values' => 'nullable|array',
         ]);
+
+        if (!$apiKey) {
+            return response()->json([
+                'success' => false,
+                'message' => 'API key is required (send as api_key in body or Bearer token in header)'
+            ], 401);
+        }
 
         if ($validator->fails()) {
             return response()->json([
@@ -40,7 +48,7 @@ class DataIotApiController extends Controller
 
         try {
             // Verify API key using ApiToken model
-            $apiToken = ApiToken::findToken($request->api_key);
+            $apiToken = ApiToken::findToken($apiKey);
             
             if (!$apiToken || $apiToken->isExpired() || !$apiToken->active) {
                 return response()->json([
@@ -294,5 +302,112 @@ class DataIotApiController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function index(Request $request)
+    {
+        // Ambil API key dari Bearer token
+        $apiKey = $request->bearerToken();
+        if (!$apiKey) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bearer token required'
+            ], 401);
+        }
+
+        // Validasi input
+        $validator = Validator::make($request->all(), [
+            'scheme_id' => 'required|exists:schemes,id',
+            'from' => 'nullable|date',
+            'to' => 'nullable|date',
+            'limit' => 'nullable|integer|min:1|max:1000'
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Cek API token
+        $apiToken = ApiToken::findToken($apiKey);
+        if (!$apiToken || $apiToken->isExpired() || !$apiToken->active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired API key'
+            ], 401);
+        }
+        $apiToken->recordUsage();
+        $user = $apiToken->user;
+
+        // Cek scheme milik user
+        $scheme = Scheme::with(['sensors' => function($query) {
+            $query->withPivot('alias', 'order')->orderBy('scheme_sensors.order');
+        }])->findOrFail($request->scheme_id);
+
+        if ($scheme->user_id != $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Scheme does not belong to authorized user'
+            ], 403);
+        }
+
+        // Query data IoT
+        $query = DataIot::where('scheme_id', $scheme->id);
+
+        // Filter by date range
+        if ($request->filled('from')) {
+            $query->where('created_at', '>=', $request->input('from'));
+        }
+        if ($request->filled('to')) {
+            $query->where('created_at', '<=', $request->input('to'));
+        }
+
+        // Limit
+        $limit = $request->input('limit', 100);
+        $data = $query->orderBy('created_at', 'desc')->limit($limit)->get();
+
+        // Format data mirip dashboard (processedData)
+        $result = [];
+        foreach ($data as $item) {
+            $jsonData = $item->json_content;
+            if (is_string($jsonData)) {
+                $jsonData = json_decode($jsonData, true);
+            }
+            $result[] = [
+                'id' => $item->id,
+                'created_at' => $item->created_at->toISOString(),
+                'sensors' => $jsonData,
+                'additional_content' => $item->additional_content
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'scheme' => [
+                'id' => $scheme->id,
+                'name' => $scheme->name,
+                'description' => $scheme->description,
+                'visualization_type' => $scheme->visualization_type,
+                'additional_columns' => $scheme->additional_columns,
+                'sensors' => $scheme->sensors->map(function($sensor) {
+                    return [
+                        'id' => $sensor->id,
+                        'name' => $sensor->name,
+                        'description' => $sensor->description,
+                        'num_of_outputs' => $sensor->num_of_outputs,
+                        'output_labels' => $sensor->output_labels,
+                        'picture' => $sensor->picture,
+                        'validation_settings' => $sensor->validation_settings,
+                        'pivot' => [
+                            'alias' => $sensor->pivot->alias ?? null,
+                            'order' => $sensor->pivot->order ?? 0,
+                        ]
+                    ];
+                })->toArray()
+            ],
+            'data' => $result
+        ]);
     }
 }

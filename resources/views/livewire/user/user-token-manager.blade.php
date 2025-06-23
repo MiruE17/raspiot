@@ -387,17 +387,18 @@
             <div class="mt-4 mb-6">
                 <div class="mb-4">
                     <label for="expiryDate" class="block text-sm font-medium text-gray-700 dark:text-gray-400">
-                        Expiry Date (optional)
+                        Expiry Date
                     </label>
                     <input 
                         type="date" 
                         id="expiryDate" 
                         wire:model.defer="expiryDate"
                         min="{{ date('Y-m-d', strtotime('+1 day')) }}"
+                        max="{{ date('Y-m-d', strtotime('+1 year')) }}"
                         class="block w-full px-2 py-2 mt-1 text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-blue-400 focus:ring focus:ring-blue-300 focus:ring-opacity-50 rounded-md shadow-sm dark:text-gray-300"
                     >
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Leave blank for a token that does not expire.
+                        Blank expiry date will default to 1 day validity. Max Validity is 1 year
                     </p>
                     @error('expiryDate') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
                 </div>
