@@ -36,6 +36,9 @@ class SchemeDashboard extends Component
     public $aggregationFunction = 'avg'; // avg, median
     public $showRawData = true; // Toggle between aggregated and raw data view
     
+    // Tambahkan property:
+    public $selectedBarRecord = null;
+    
     protected $queryString = [
         'timeRange' => ['except' => '7d'],
         'perPage' => ['except' => 10],
@@ -61,6 +64,7 @@ class SchemeDashboard extends Component
         
         $this->setDateRange();
         $this->loadData();
+        $this->resetSelectedBarRecord();
         $this->lastDataCount = $this->getDataCount();
     }
     
@@ -176,7 +180,7 @@ class SchemeDashboard extends Component
         // Load fresh data jika ada perubahan atau manual refresh
         if ($hasNewData) {
             $this->loadData();
-            
+            $this->resetSelectedBarRecord();
             // Hanya dispatch chart update jika perlu
             if ($context === 'manual' || $currentTotalDataCount !== $this->lastDataCount) {
                 // Reload scheme with fresh relations
@@ -259,6 +263,8 @@ class SchemeDashboard extends Component
         
         // PENTING: Update last TOTAL data count (bukan filtered count)
         $this->lastDataCount = $currentTotalDataCount;
+
+        
     }
     
     private function setDateRange()
@@ -493,6 +499,8 @@ class SchemeDashboard extends Component
         
         // PENTING: Sync total count untuk mencegah false positive
         $this->lastDataCount = $this->getDataCount();
+        //$this->showRawData = ($value === 'raw');
+        $this->resetSelectedBarRecord();
         
         $schemeData = [
             'id' => $this->scheme->id,
@@ -609,6 +617,7 @@ class SchemeDashboard extends Component
     {
         $this->showRawData = !$this->showRawData;
         $this->resetPage(); // Reset pagination when toggling view
+        $this->resetSelectedBarRecord();
         
         \Log::info('Data view toggled', [
             'showRawData' => $this->showRawData,
@@ -1247,6 +1256,7 @@ class SchemeDashboard extends Component
     public function render()
     {
         $scheme = $this->scheme; // Pastikan $scheme sudah di-load
+        //$this->resetSelectedBarRecord(); // Reset selected bar record on render
 
         if ($scheme->visualization_type === 'bar') {
             return view('livewire.user.user-scheme-dashboard-bar', [
@@ -1327,5 +1337,20 @@ class SchemeDashboard extends Component
     {
         // Sama persis dengan refreshData, tapi hanya untuk bar chart
         $this->refreshData($context);
+    }
+    
+    // Tambahkan method:
+    public function selectBarRecord($index)
+    {
+        $this->selectedBarRecord = $index;
+        $this->dispatch('bar-record-selected', $index);
+    }
+    
+    public function resetSelectedBarRecord()
+    {
+        // Selalu select latest (paling akhir) pada mode aktif
+        $count = is_array($this->processedData) ? count($this->processedData) : null;
+        $this->selectedBarRecord = $count > 0 ? $count - 1 : null;
+        $this->dispatch('bar-record-selected', $this->selectedBarRecord);
     }
 }

@@ -115,7 +115,7 @@ class TokenManager extends Component
         if ($token) {
             $this->newToken = [
                 'id' => $token->id,
-                'full_token' => $token->id . '|' . $plainToken,
+                'full_token' => $plainToken,
             ];
             
             $this->showNewToken = true;
@@ -154,5 +154,9 @@ class TokenManager extends Component
         
         $this->tokenId = null;
         $this->showDeleteModal = false;
+    }
+    public function updatedSearch()
+    {
+        $this->resetPage();
     }
 }

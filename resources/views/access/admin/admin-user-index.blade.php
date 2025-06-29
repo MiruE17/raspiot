@@ -6,7 +6,7 @@
 @section('header')
     <h2 class="my-6 text-2xl font-semibold text-gray-700 dark:text-gray-200">
         Users
-        {{-- <span class="text-sm font-normal block text-gray-600 dark:text-gray-400">Manage system users</span> --}}
+        <span class="text-sm font-normal block text-gray-600 dark:text-gray-400">Manage system users</span>
     </h2>
 @endsection
 

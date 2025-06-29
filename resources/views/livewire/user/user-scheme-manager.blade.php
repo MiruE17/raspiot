@@ -568,10 +568,11 @@
     "values": "",
     "additional_values": { 
         @if($additionalCount > 0)@foreach($selectedScheme->additional_columns as $index => $column)    "{{ $column['name'] }}": "{{ $column['default_value'] ?? 'value' }}"{{ $index < count($selectedScheme->additional_columns) - 1 ? ',' : ' ' }}
-        @endforeach@else// No additional columns defined @endif
+        @endforeach@else// No additional columns, not required to send (can be skipped)@endif
     }
 }</code></pre>
-            </div>
+           </div>
+           <span class="text-xs text-gray-500 dark:text-green-400">API Key can also be sent via Bearer Authentication</span>
         </div>
     </div>
     
@@ -646,7 +647,7 @@
                                         <div class="flex items-center justify-between bg-white dark:bg-gray-800 p-2 rounded-md">
                                             <div class="flex items-center">
                                                 <!-- Order indicator -->
-                                                <div class="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 flex items-center justify-center mr-3">
+                                                <div class="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 flex items-center justify-center mr-3" style="color:black">
                                                     <span>{{ $index + 1 }}</span>
                                                 </div>
                                                 
@@ -724,7 +725,7 @@
                         @foreach($selectedScheme->sensors as $sensor)
                             <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg flex items-center gap-3">
                                 <!-- Sensor Image -->
-                                <div class="w-12 mr-2h-12 bg-gray-200 dark:bg-gray-600 rounded-lg overflow-hidden flex-shrink-0">
+                                <div class="w-12 mr-4 bg-gray-200 dark:bg-gray-600 rounded-lg overflow-hidden flex-shrink-0">
                                     @if($sensor->picture)
                                         <img src="{{ asset('storage/' . $sensor->picture) }}" 
                                              alt="{{ $sensor->name }}"
@@ -901,77 +902,41 @@
             </label>
             
             @if(!$schemeId)
-                <!-- Show visualization options only in CREATE mode -->
-                {{-- <div class="flex space-x-3">
-                    <!-- Line Chart (timeseries) option -->
-                    <label class="visualization-option flex-1">
-                        <input type="radio" wire:model.live="visualizationType" value="line" class="peer sr-only">
-                        <div class="flex flex-col items-center p-2 border-2 rounded-lg cursor-pointer peer-checked:border-blue-500 peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900 dark:peer-checked:border-blue-500 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900">
-                            <svg class="w-6 h-6 mb-1 peer-checked:text-blue-600 dark:peer-checked:text-blue-400 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4v16"></path>
-                            </svg>
-                            <span class="text-xs font-medium peer-checked:text-blue-600 dark:peer-checked:text-blue-400 text-gray-500 dark:text-gray-400">Line Chart</span>
+                                <div 
+                    x-data="{ visualizationType: @entangle('visualizationType') }" 
+                    class="flex space-x-3"
+                >
+                    <template x-for="type in [
+                        {key: 'line', label: 'Line Chart', icon: 'M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4v16'},
+                        {key: 'bar', label: 'Bar Chart', icon: 'M8 13v-1m4 1v-3m4 3V8M8 21l4-4 4 4M3 4h18M4 4v16'},
+                        {key: 'none', label: 'Table Only', icon: 'M3 9h18M3 15h18M9 5v14M15 5v14'}
+                    ]" :key="type.key">
+                        <div
+                            class="visualization-option flex-1 cursor-pointer rounded-xl transition-all duration-200 select-none"
+                            :class="visualizationType === type.key 
+                                ? 'border-2 border-blue-600 bg-blue-50 dark:bg-blue-900 shadow-lg ring-2 ring-blue-300 dark:ring-blue-700'
+                                : 'border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900'"
+                            @click="visualizationType = type.key"
+                            @keydown.enter.space.prevent="visualizationType = type.key"
+                            tabindex="0"
+                        >
+                            <div class="flex flex-col items-center p-2 rounded-xl transition-all duration-200">
+                                <svg class="w-6 h-6 mb-1 transition-colors duration-200"
+                                    :class="visualizationType === type.key 
+                                        ? 'text-blue-600 dark:text-blue-400'
+                                        : 'text-gray-500 dark:text-gray-400'"
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path :d="type.icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                                </svg>
+                                <span class="text-xs font-medium transition-colors duration-200"
+                                    :class="visualizationType === type.key 
+                                        ? 'text-blue-700 dark:text-blue-300'
+                                        : 'text-gray-500 dark:text-gray-400'">
+                                    <span x-text="type.label"></span>
+                                </span>
+                            </div>
                         </div>
-                    </label>
-                    
-                    <!-- Bar Chart option -->
-                    <label class="visualization-option flex-1">
-                        <input type="radio" wire:model.live="visualizationType" value="bar" class="peer sr-only">
-                        <div class="flex flex-col items-center p-2 border-2 rounded-lg cursor-pointer peer-checked:border-blue-500 peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900 dark:peer-checked:border-blue-500 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900">
-                            <svg class="w-6 h-6 mb-1 peer-checked:text-blue-600 dark:peer-checked:text-blue-400 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 13v-1m4 1v-3m4 3V8M8 21l4-4 4 4M3 4h18M4 4v16"></path>
-                            </svg>
-                            <span class="text-xs font-medium peer-checked:text-blue-600 dark:peer-checked:text-blue-400 text-gray-500 dark:text-gray-400">Bar Chart</span>
-                        </div>
-                    </label>
-                    
-                    <label class="visualization-option flex-1">
-                        <input type="radio" wire:model.live="visualizationType" value="none" class="peer sr-only">
-                        <div class="flex flex-col items-center p-2 border-2 rounded-lg cursor-pointer peer-checked:border-blue-500 peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900 dark:peer-checked:border-blue-500 border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900">
-                            <svg class="w-6 h-6 mb-1 peer-checked:text-blue-600 dark:peer-checked:text-blue-400 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9h18M3 15h18M9 5v14M15 5v14"></path>
-                            </svg>
-                            <span class="text-xs font-medium peer-checked:text-blue-600 dark:peer-checked:text-blue-400 text-gray-500 dark:text-gray-400">Table Only</span>
-                        </div>
-                    </label>
-                </div> --}}
-                                <div class="flex space-x-3">
-                    <label class="visualization-option flex-1 cursor-pointer">
-                        <input type="radio" wire:model.live="visualizationType" value="line" class="sr-only peer">
-                        <div class="flex flex-col items-center p-2 border-2 rounded-lg transition
-                            border-gray-200 dark:border-gray-700
-                            peer-checked:border-blue-500 peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900
-                            hover:bg-blue-50 dark:hover:bg-blue-900">
-                            <svg class="w-6 h-6 mb-1 text-gray-500 dark:text-gray-400 peer-checked:text-blue-600 dark:peer-checked:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4v16"></path>
-                            </svg>
-                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 peer-checked:text-blue-600 dark:peer-checked:text-blue-400">Line Chart</span>
-                        </div>
-                    </label>
-                    <label class="visualization-option flex-1 cursor-pointer">
-                        <input type="radio" wire:model.live="visualizationType" value="bar" class="sr-only peer">
-                        <div class="flex flex-col items-center p-2 border-2 rounded-lg transition
-                            border-gray-200 dark:border-gray-700
-                            peer-checked:border-purple-500 peer-checked:bg-purple-50 dark:peer-checked:bg-purple-900
-                            hover:bg-purple-50 dark:hover:bg-purple-900">
-                            <svg class="w-6 h-6 mb-1 text-gray-500 dark:text-gray-400 peer-checked:text-purple-600 dark:peer-checked:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 13v-1m4 1v-3m4 3V8M8 21l4-4 4 4M3 4h18M4 4v16"></path>
-                            </svg>
-                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 peer-checked:text-purple-600 dark:peer-checked:text-purple-400">Bar Chart</span>
-                        </div>
-                    </label>
-                    <label class="visualization-option flex-1 cursor-pointer">
-                        <input type="radio" wire:model.live="visualizationType" value="none" class="sr-only peer">
-                        <div class="flex flex-col items-center p-2 border-2 rounded-lg transition
-                            border-gray-200 dark:border-gray-700
-                            peer-checked:border-gray-500 peer-checked:bg-gray-100 dark:peer-checked:bg-gray-900
-                            hover:bg-gray-100 dark:hover:bg-gray-900">
-                            <svg class="w-6 h-6 mb-1 text-gray-500 dark:text-gray-400 peer-checked:text-gray-700 dark:peer-checked:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9h18M3 15h18M9 5v14M15 5v14"></path>
-                            </svg>
-                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 peer-checked:text-gray-700 dark:peer-checked:text-gray-200">Table Only</span>
-                        </div>
-                    </label>
+                    </template>
                 </div>
             @else
                 <!-- Display readonly visualization type if mode EDIT -->
@@ -1019,7 +984,7 @@
                         </button>
                     @else
                         <button
-                            @click="if (!showSensorModal) { open = false }"
+                            @click="showSensorModal = false; open = false"
                             class="w-full px-5 py-3 text-sm font-medium leading-5 text-gray-700 transition-colors duration-150 border border-gray-300 rounded-lg dark:text-gray-400 sm:px-4 sm:py-2 sm:w-auto active:bg-transparent hover:border-gray-500 focus:border-gray-500 active:text-gray-500 focus:outline-none focus:shadow-outline-gray"
                         >
                             Cancel
@@ -1142,7 +1107,8 @@
         x-transition:leave-end="opacity-0 transform translate-y-1/2"
         @click.away="showSensorModal = false"
         @keydown.escape.window.stop="showSensorModal = false"
-        class="w-full px-6 py-4 overflow-hidden bg-white rounded-t-lg dark:bg-gray-800 sm:rounded-lg sm:m-4 sm:max-w-xl"
+        class="w-full max-w-4xl px-6 py-4 overflow-hidden bg-white rounded-t-lg dark:bg-gray-800 sm:rounded-lg sm:m-4"
+        style="max-width: 900px; max-height: 70vh;" {{-- lebih pendek --}}
     >
         <!-- Modal header -->
         <header class="flex justify-between">
@@ -1160,11 +1126,11 @@
             </button>
         </header>
         <!-- Modal body -->
-        <div class="mt-4 mb-6 overflow-y-auto" style="max-height: 60vh;">
+        <div class="mt-4 mb-6 overflow-y-auto" style="max-height: 48vh;">
             <!-- Left-Right Panel Layout -->
             <div class="flex gap-4 h-full">
-                <!-- Left Panel - Available Sensors -->
-                <div class="w-1/2 flex flex-col">
+                <!-- Left Panel - Available Sensors (40%) -->
+                <div class="flex flex-col" style="flex-basis:40%; min-width:0;">
                     <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Available Sensors
                     </h3>
@@ -1192,7 +1158,7 @@
                                     x-show="searchQuery === '' || sensor.name.toLowerCase().includes(searchQuery.toLowerCase())"
                                     class="p-2 hover:bg-gray-50 dark:hover:bg-gray-700 flex justify-between items-center"
                                 >
-                                    <div class="flex items-center">
+                                    <div class="flex items-center min-w-0">
                                         <!-- Sensor icon or image -->
                                         <div class="h-8 w-8 rounded-md bg-gray-200 dark:bg-gray-700 flex items-center justify-center mr-2">
                                             <template x-if="sensor.picture">
@@ -1206,9 +1172,16 @@
                                         </div>
                                         
                                         <!-- Sensor details -->
-                                        <div>
-                                            <h4 class="font-medium text-sm text-gray-900 dark:text-white" x-text="sensor.name"></h4>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400" x-text="sensor.num_of_outputs + ' output(s)'"></p>
+                                        <div class="min-w-0">
+                                            <h4 class="font-medium text-sm text-gray-900 dark:text-white truncate" 
+                                                :title="sensor.name"
+                                                style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+                                                x-text="sensor.name"></h4>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 truncate" 
+                                               :title="sensor.num_of_outputs + ' output(s)'"
+                                               style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+
+                                               x-text="sensor.num_of_outputs + ' output(s)'"></p>
                                         </div>
                                     </div>
                                     
@@ -1228,25 +1201,30 @@
                     </div>
                 </div>
                 
-                <!-- Right Panel - Selected Sensors -->
-                <div class="w-1/2 flex flex-col">
+                <!-- Right Panel - Selected Sensors (60%) -->
+                <div class="flex flex-col" style="flex-basis:60%; min-width:0;">
                     <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Selected Sensors
+                        Selected Sensors <span class="text-xs text-gray-500 dark:text-gray-400">(Order of Sensors determine the order of Value to be sent by API)</span>
                     </h3>
                     
+
                     <!-- Selected Sensors List (static, no drag) -->
                     <div class="flex-1 overflow-y-auto border rounded-md dark:border-gray-700 h-48">
                         <ul class="divide-y divide-gray-200 dark:divide-gray-700">
                             @foreach($selectedSensorDetails as $index => $sensor)
-                                <li class="p-2 bg-white dark:bg-gray-800 flex items-center sensor-item">
+                                <li class="p-2 bg-white dark:bg-gray-800 flex items-center sensor-item min-w-0">
                                     <!-- Static order badge -->
                                     <div class="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center mr-2 text-xs font-medium flex-shrink-0">
                                         {{ $index + 1 }}
                                     </div>
                                     
                                     <!-- Sensor name -->
-                                    <div class="flex-1 min-w-0 mr-2">
-                                        <h4 class="font-medium text-sm text-gray-900 dark:text-white truncate">{{ $sensor['name'] }}</h4>
+                                    <div class="flex-1 mr-2" style="min-width: 0;">
+                                        <h4 class="font-medium text-sm text-gray-900 dark:text-white truncate"
+                                            title="{{ $sensor['name'] }}"
+                                            style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                            {{ $sensor['name'] }}
+                                        </h4>
                                     </div>
                                     
                                     <!-- Alias input -->
@@ -1289,10 +1267,5 @@
 </div>
         
 </div>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
-<style>
-
-
-</style>
 </div>
 

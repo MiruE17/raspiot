@@ -200,7 +200,7 @@
                                     <td class="px-4 py-3 text-sm">
                                         @if($token->active)
                                             @if($token->isExpired())
-                                                <span class="px-2 py-1 font-semibold leading-tight text-red-700 bg-red-100 rounded-full dark:bg-red-700 dark:text-red-100">
+                                                <span class="px-2 py-1 font-semibold leading-tight bg-orange-100 rounded-full dark:bg-orange-700" style="color: red;">
                                                     Expired
                                                 </span>
                                             @else
@@ -216,7 +216,7 @@
                                     </td>
                                     <td class="px-4 py-3 text-sm">
                                         <div class="flex items-center space-x-2">
-                                            @if($token->active)
+                                            @if($token->active && !$token->isExpired())
                                                 <!-- Hanya tampilkan tombol revoke jika token masih aktif -->
                                                 <button
                                                     wire:click="confirmDelete({{ $token->id }})"

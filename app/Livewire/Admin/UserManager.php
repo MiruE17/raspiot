@@ -183,4 +183,9 @@ class UserManager extends Component
         $this->viewMode = false;
         $this->selectedUser = null;
     }
+    
+    public function updatedSearch()
+    {
+        $this->resetPage();
+    }
 }

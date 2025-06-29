@@ -139,7 +139,6 @@
                                         <span class="ml-1">{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>
                                     @endif
                                 </th>
-                                <th class="px-4 py-3">Token Preview</th>
                                 <th wire:click="sortBy('hit_count')" class="px-4 py-3 cursor-pointer">
                                     Usage
                                     @if ($sortField === 'hit_count')
@@ -202,9 +201,6 @@
                                         </div>
                                     </td>
                                     <td class="px-4 py-3 text-sm">
-                                        <span class="font-mono">{{ $token->getMaskedToken() }}</span>
-                                    </td>
-                                    <td class="px-4 py-3 text-sm">
                                         {{ $token->hit_count }} hits
                                     </td>
                                     <td class="px-4 py-3 text-sm">
@@ -219,7 +215,7 @@
                                     <td class="px-4 py-3 text-sm">
                                         @if($token->active)
                                             @if($token->isExpired())
-                                                <span class="px-2 py-1 font-semibold leading-tight text-orange-700 bg-orange-100 rounded-full dark:bg-orange-700 dark:text-orange-100">
+                                                <span class="px-2 py-1 font-semibold leading-tight bg-orange-100 rounded-full dark:bg-orange-700" style="color:red;">
                                                     Expired
                                                 </span>
                                             @else
@@ -235,7 +231,7 @@
                                     </td>
                                     <td class="px-4 py-3 text-sm">
                                         <div class="flex items-center space-x-2">
-                                            @if($token->active)
+                                            @if($token->active && !$token->isExpired())
                                                 <button
                                                     wire:click="confirmDelete({{ $token->id }})"
                                                     class="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded-full dark:text-red-400 focus:outline-none focus:shadow-outline-red"

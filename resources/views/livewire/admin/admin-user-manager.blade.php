@@ -13,7 +13,7 @@
                     wire:model.live.debounce.300ms="search" 
                     class="w-full pl-10 pr-4 py-2 text-sm text-gray-700 bg-gray-100 border-0 rounded-md dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 focus:border-blue-400 focus:outline-none focus:shadow-outline-blue" 
                     type="text" 
-                    placeholder="Search sensors..." 
+                    placeholder="Search users..." 
                     aria-label="Search" 
                 />
             </div>
@@ -324,8 +324,8 @@
 
     <!-- Delete Confirmation Modal - MENGIKUTI TOKEN MANAGER -->
     <div
-        x-data="{ show: @entangle('showDeleteModal').defer }"
-        x-cloak
+        x-data="{ show: @entangle('showDeleteModal') }"
+        x-show="show"
     >
         <div
             x-show="show"

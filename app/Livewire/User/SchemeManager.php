@@ -363,6 +363,7 @@ public function updatePendingSensors($sensorIds)
         $this->additionalColumns = []; // Reset additional columns
         $this->sensorAliases = ['']; // Reset the aliases array
         $this->selectedScheme = null;
+        $this->selectedSensorDetails = []; // Reset selected sensor details
         $this->viewMode = false;
     }
     
@@ -610,5 +611,9 @@ public function updatePendingSensors($sensorIds)
             'picture' => $sensor->picture,
             'validation_settings' => $sensor->validation_settings
         ];
+    }
+    public function updatedSearch()
+    {
+        $this->resetPage();
     }
 }

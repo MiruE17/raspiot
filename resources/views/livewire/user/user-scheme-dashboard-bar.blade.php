@@ -266,6 +266,7 @@
     <table class="w-full whitespace-no-wrap">
         <thead>
             <tr class="text-xs font-semibold tracking-wide text-left text-gray-500 uppercase border-b dark:border-gray-700 bg-gray-50 dark:text-gray-400 dark:bg-gray-800">
+                <th class="px-2 py-3">Select</th>
                 @if($dataAggregation === 'raw' || $showRawData)
                 <th class="px-2 py-3">Time</th>
                 @endif
@@ -325,8 +326,17 @@
             
             @if($dataAggregation !== 'raw' && !$showRawData)
             {{-- Display aggregated data --}}
-            @forelse($paginatedData as $data)
-            <tr class="text-gray-700 dark:text-gray-400">
+            @forelse($paginatedData as $idx => $data)
+            <tr class="text-gray-700 dark:text-gray-400 {{ ($selectedBarRecord === ($paginatedData->count() - 1 - $idx) && ($dataAggregation !== 'raw' && !$showRawData)) ? 'bg-blue-50 dark:bg-blue-900' : '' }}">
+                <td class="px-2 py-3">
+                    <button 
+                    wire:click="selectBarRecord({{ $paginatedData->count() - 1 - $idx }})"
+                    class="px-2 py-1 text-xs rounded {{ ($selectedBarRecord === ($paginatedData->count() - 1 - $idx) && ($dataAggregation !== 'raw' && !$showRawData)) ? 'bg-blue-600 text-white ring-2 ring-blue-400' : 'bg-gray-50 text-gray-700 hover:bg-blue-100' }}"
+                    title="Select this record for bar chart"
+                    >
+                    {{ ($selectedBarRecord === ($paginatedData->count() - 1 - $idx) && ($dataAggregation !== 'raw' && !$showRawData)) ? 'Selected' : 'Select' }}
+                    </button>
+                </td>
                 <td class="px-4 py-3 text-sm font-medium">
                     {{ $data['period'] }}
                 </td>
@@ -384,8 +394,17 @@
             @endforelse
             @else
             {{-- Display raw data --}}
-            @forelse($paginatedData as $data)
-            <tr class="text-gray-700 dark:text-gray-400">
+            @forelse($paginatedData as $idx => $data)
+            <tr class="text-gray-700 dark:text-gray-400 {{ (($paginatedData->count() - 1 - $idx) && ($dataAggregation === 'raw' && $showRawData)) ? 'bg-blue-50 dark:bg-blue-900' : '' }}">
+                <td class="px-2 py-3">
+                    <button 
+                    wire:click="selectBarRecord({{ $paginatedData->count() - 1 - $idx }})"
+                    class="px-2 py-1 text-xs rounded {{ (($selectedBarRecord === ($paginatedData->count() - 1 - $idx)) && ($dataAggregation === 'raw' && $showRawData)) ? 'bg-blue-600 text-white ring-2 ring-blue-400' : 'bg-orange-100 text-gray-700 hover:bg-blue-100' }}"
+                    title="Select this record for bar chart"
+                    >
+                    {{ (($selectedBarRecord === ($paginatedData->count() - 1 - $idx)) && ($dataAggregation === 'raw' && $showRawData)) ? 'Selected' : 'Select' }}
+                    </button>
+                </td>
                 <td class="px-2 py-3 text-sm">
                     {{ $data->created_at->format('Y-m-d H:i:s') }}
                 </td>
@@ -498,7 +517,14 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
 <script>
-    function renderBarChart(processedData, scheme){
+    let selectedBarRecord = null;
+
+    Livewire.on('bar-record-selected', (idx) => {
+        selectedBarRecord = idx;
+        renderBarChart(currentProcessedData, currentScheme, selectedBarRecord);
+    });
+
+    function renderBarChart(processedData, scheme, selectedIdx = null){
         // Ambil validation_settings dari setiap sensor
         let sensorOutputTypes = [];
         scheme.sensors.forEach(sensor => {
@@ -530,7 +556,12 @@
         }
         
         // Ambil record terakhir
-        const latest = processedData[processedData.length - 1];
+        let latest;
+        if (selectedIdx !== null && processedData[selectedIdx]) {
+            latest = processedData[selectedIdx];
+        } else {
+            latest = processedData[processedData.length - 1];
+        }
         
         // Siapkan label, value, dan format untuk setiap sensor-output
         let barLabels = [];
@@ -774,7 +805,7 @@
             lastBarDataTimestamp = latestTimestamp;
             currentProcessedData = processedData;
             currentScheme = scheme;
-            renderBarChart(processedData, scheme);
+            renderBarChart(processedData, scheme, selectedBarRecord);
             console.log('✅ Bar chart updated with new data at', latestTimestamp);
         } else {
             console.log('⏸️ No new data for bar chart');

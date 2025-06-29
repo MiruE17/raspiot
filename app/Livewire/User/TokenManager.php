@@ -168,4 +168,8 @@ class TokenManager extends Component
         $this->showDeleteModal = false;
         $this->tokenId = null;
     }
+    public function updatedSearch()
+    {
+        $this->resetPage();
+    }
 }
