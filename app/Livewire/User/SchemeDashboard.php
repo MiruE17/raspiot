@@ -662,7 +662,7 @@ class SchemeDashboard extends Component
         
         // Get the data for chart (limited amount for performance)
         $this->chartData = $query
-            ->orderBy('created_at')
+            ->orderBy('id')
             ->limit($limit)
             ->get();
             
@@ -745,7 +745,7 @@ class SchemeDashboard extends Component
         }
         
         // Get all data for aggregation
-        $rawData = $query->orderBy('created_at')->get();
+        $rawData = $query->orderBy('id')->get();
         
         // Process and aggregate the data
         $this->processedData = $this->aggregateData($rawData, $periodInfo);
