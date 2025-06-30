@@ -1338,10 +1338,17 @@ class SchemeDashboard extends Component
         // Sama persis dengan refreshData, tapi hanya untuk bar chart
         $this->refreshData($context);
     }
-    
-    // Tambahkan method:
-    public function selectBarRecord($index)
+    public function selectBarRecordById($id)
     {
+        $index = null;
+        foreach ($this->processedData as $i => $item) {
+            // Untuk raw data, $item bisa object atau array
+            $itemId = is_array($item) ? $item['id'] : $item->id;
+            if ((string)$itemId === (string)$id) {
+                $index = $i;
+                break;
+            }
+        }
         $this->selectedBarRecord = $index;
         $this->dispatch('bar-record-selected', $index);
     }

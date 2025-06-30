@@ -328,19 +328,18 @@
             {{-- Display aggregated data --}}
             @forelse($paginatedData as $idx => $data)
             @php
-            // Cari index global di $processedData
-            $globalIdx = array_search($data->id, array_column($processedData, 'id'));
-            @endphp
-            <tr class="text-gray-700 dark:text-gray-400 {{ ($selectedBarRecord === (count($processedData) - 1 - $globalIdx) && ($dataAggregation !== 'raw' && !$showRawData)) ? 'bg-blue-50 dark:bg-blue-900' : '' }}">
-                <td class="px-2 py-3">
-                    <button 
-                    wire:click="selectBarRecord({{ count($processedData) - 1 - $globalIdx }})"
-                    class="px-2 py-1 text-xs rounded {{ ($selectedBarRecord === (count($processedData) - 1 - $globalIdx) && ($dataAggregation !== 'raw' && !$showRawData)) ? 'bg-blue-600 text-white ring-2 ring-blue-400' : 'bg-gray-50 text-gray-700 hover:bg-blue-100' }}"
-                    title="Select this record for bar chart"
-                    >
-                    {{ ($selectedBarRecord === (count($processedData) - 1 - $globalIdx) && ($dataAggregation !== 'raw' && !$showRawData)) ? 'Selected' : 'Select' }}
-                    </button>
-                </td>
+    $globalIdx = array_search($data['id'], array_column($processedData, 'id'));
+@endphp
+<tr class="text-gray-700 dark:text-gray-400 {{ ($selectedBarRecord === $globalIdx && ($dataAggregation !== 'raw' && !$showRawData)) ? 'bg-blue-50 dark:bg-blue-900' : '' }}">
+    <td class="px-2 py-3">
+        <button 
+            wire:click="selectBarRecordById('{{ $data['id'] }}')"
+            class="px-2 py-1 text-xs rounded {{ ($selectedBarRecord === $globalIdx && ($dataAggregation !== 'raw' && !$showRawData)) ? 'bg-blue-600 text-white ring-2 ring-blue-400' : 'bg-gray-50 text-gray-700 hover:bg-blue-100' }}"
+            title="Select this record for bar chart"
+        >
+            {{ ($selectedBarRecord === $globalIdx && ($dataAggregation !== 'raw' && !$showRawData)) ? 'Selected' : 'Select' }}
+        </button>
+    </td>
                 <td class="px-4 py-3 text-sm font-medium">
                     {{ $data['period'] }}
                 </td>
@@ -400,19 +399,18 @@
             {{-- Display raw data --}}
             @forelse($paginatedData as $idx => $data)
             @php
-            // Cari index global di $processedData
-            $globalIdx = array_search($data->id, array_column($processedData, 'id'));
-            @endphp
-            <tr class="text-gray-700 dark:text-gray-400 {{ ((count($processedData) - 1 - $globalIdx) && ($dataAggregation === 'raw' && $showRawData)) ? 'bg-blue-50 dark:bg-blue-900' : '' }}">
-                <td class="px-2 py-3">
-                    <button 
-                    wire:click="selectBarRecord({{ count($processedData) -1- $globalIdx }})"
-                    class="px-2 py-1 text-xs rounded {{ (($selectedBarRecord === (count($processedData) - 1 - $globalIdx)) && ($dataAggregation === 'raw' && $showRawData)) ? 'bg-blue-600 text-white ring-2 ring-blue-400' : 'bg-orange-100 text-gray-700 hover:bg-blue-100' }}"
-                    title="Select this record for bar chart"
-                    >
-                    {{ (($selectedBarRecord === (count($processedData) - 1 - $globalIdx)) && ($dataAggregation === 'raw' && $showRawData)) ? 'Selected' : 'Select' }}
-                    </button>
-                </td>
+    $globalIdx = array_search($data->id, array_column($processedData, 'id'));
+@endphp
+<tr class="text-gray-700 dark:text-gray-400 {{ ($selectedBarRecord === $globalIdx && ($dataAggregation === 'raw' && $showRawData)) ? 'bg-blue-50 dark:bg-blue-900' : '' }}">
+    <td class="px-2 py-3">
+        <button 
+            wire:click="selectBarRecordById('{{ $data->id }}')"
+            class="px-2 py-1 text-xs rounded {{ ($selectedBarRecord === $globalIdx && ($dataAggregation === 'raw' && $showRawData)) ? 'bg-blue-600 text-white ring-2 ring-blue-400' : 'bg-orange-100 text-gray-700 hover:bg-blue-100' }}"
+            title="Select this record for bar chart"
+        >
+            {{ ($selectedBarRecord === $globalIdx && ($dataAggregation === 'raw' && $showRawData)) ? 'Selected' : 'Select' }}
+        </button>
+    </td>
                 <td class="px-2 py-3 text-sm">
                     {{ $data->created_at->format('Y-m-d H:i:s') }}
                 </td>
