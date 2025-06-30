@@ -662,7 +662,8 @@ class SchemeDashboard extends Component
         
         // Get the data for chart (limited amount for performance)
         $this->chartData = $query
-            ->orderBy('id')
+            ->orderBy('created_at', 'asc')
+            ->orderBy('id', 'asc')
             ->limit($limit)
             ->get();
             
@@ -745,7 +746,7 @@ class SchemeDashboard extends Component
         }
         
         // Get all data for aggregation
-        $rawData = $query->orderBy('id')->get();
+        $rawData = $query->orderBy('created_at', 'asc')->orderBy('id', 'asc')->get();
         
         // Process and aggregate the data
         $this->processedData = $this->aggregateData($rawData, $periodInfo);
@@ -1035,7 +1036,7 @@ class SchemeDashboard extends Component
                 ]);
             }
             
-            return $query->orderBy('created_at', 'desc')->paginate($this->perPage);
+            return $query->orderBy('created_at', 'desc')->orderBy('id', 'desc')->paginate($this->perPage);
         } else {
             // For aggregated data, we'll use a manual pagination approach
             $aggregatedData = collect($this->processedData);
@@ -1080,7 +1081,7 @@ class SchemeDashboard extends Component
                 ]);
             }
             
-            $data = $query->orderBy('created_at', 'desc')->get();
+            $data = $query->orderBy('created_at', 'desc')->orderBy('id', 'desc')->get();
             $exportType = 'raw';
         } else {
             // For aggregated data, use processed data
