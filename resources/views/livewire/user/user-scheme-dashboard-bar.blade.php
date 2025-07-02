@@ -328,190 +328,201 @@
             {{-- Display aggregated data --}}
             @forelse($paginatedData as $idx => $data)
             @php
-    $globalIdx = array_search($data['id'], array_column($processedData, 'id'));
-@endphp
-<tr class="text-gray-700 dark:text-gray-400 {{ ($selectedBarRecord === $globalIdx && ($dataAggregation !== 'raw' && !$showRawData)) ? 'bg-blue-50 dark:bg-blue-900' : '' }}">
-    <td class="px-2 py-3">
-        <button 
-            wire:click="selectBarRecordById('{{ $data['id'] }}')"
-            class="px-2 py-1 text-xs rounded {{ ($selectedBarRecord === $globalIdx && ($dataAggregation !== 'raw' && !$showRawData)) ? 'bg-blue-600 text-white ring-2 ring-blue-400' : 'bg-gray-50 text-gray-700 hover:bg-blue-100' }}"
-            title="Select this record for bar chart"
-        >
-            {{ ($selectedBarRecord === $globalIdx && ($dataAggregation !== 'raw' && !$showRawData)) ? 'Selected' : 'Select' }}
-        </button>
-    </td>
-                <td class="px-4 py-3 text-sm font-medium">
-                    {{ $data['period'] }}
-                </td>
-                <td class="px-4 py-3 text-sm">
-                    {{ $data['data_count'] }} records
-                </td>
-                @php $sensorIdx = 0; @endphp
-                @foreach($scheme->sensors as $sensor)
-                @php
-                $outputs = $sensor->num_of_outputs ?: 1;
-                $outputLabels = explode(',', $sensor->output_labels ?? '');
-                // Cari sensorData hanya berdasarkan id
-                $sensorData = null;
-                foreach ($data['sensors'] as $aggSensor) {
-                    if ($aggSensor['id'] == $sensor->id) {
-                        $sensorData = $aggSensor;
-                        break;
-                    }
-                }
-                @endphp
-                @for($i = 0; $i < $outputs; $i++)
-                @php
-                $label = isset($outputLabels[$i]) ? trim($outputLabels[$i]) : "Value " . ($i + 1);
-                $value = $sensorData && isset($sensorData['values'][$label])
-                ? $sensorData['values'][$label]
-                : '-';
-                $type = $sensorOutputTypes[$sensorIdx][$i] ?? 'number';
-                if (is_numeric($value)) {
-                    if ($type === 'percentage') {
-                        $value = number_format($value * 100, 2) . '%';
-                    } else {
-                        $value = number_format($value, 2);
-                    }
-                }
-                @endphp
-                <td class="px-4 py-3 text-sm">
-                    {{ $value }}
-                </td>
-                @endfor
-                @php $sensorIdx++; @endphp
-                @endforeach
-                
-                @if(is_array($scheme->additional_columns) && count($scheme->additional_columns) > 0)
-                @foreach($scheme->additional_columns as $column)
-                <td class="px-4 py-3 text-sm">-</td>
-                @endforeach
-                @endif
-            </tr>
-            @empty
-            <tr>
-                <td colspan="{{ $scheme->sensors->sum(function($s) { return $s->num_of_outputs ?: 1; }) + count($scheme->additional_columns ?? []) + 2 }}" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400">
-                    No aggregated data available for the selected time range.
-                </td>
-            </tr>
-            @endforelse
-            @else
-            {{-- Display raw data --}}
-            @forelse($paginatedData as $idx => $data)
+            $globalIdx = array_search($data['id'], array_column($processedData, 'id'));
+            @endphp
+            <tr class="text-gray-700 dark:text-gray-400 {{ ($selectedBarRecord === $globalIdx && ($dataAggregation !== 'raw' && !$showRawData)) ? 'bg-blue-50 dark:bg-blue-900' : '' }}">
+                <td class="px-2 py-3">
+                    <button 
+                    wire:click="selectBarRecordById('{{ $data['id'] }}')"
+                    class="px-2 py-1 text-xs rounded {{ ($selectedBarRecord === $globalIdx && ($dataAggregation !== 'raw' && !$showRawData)) ? 'bg-blue-600 text-white ring-2 ring-blue-400' : 'bg-gray-50 text-gray-700 hover:bg-blue-100' }}"
+                    title="Select this record for bar chart"
+                    >
+                    {{ ($selectedBarRecord === $globalIdx && ($dataAggregation !== 'raw' && !$showRawData)) ? 'Selected' : 'Select' }}
+                </button>
+            </td>
+            <td class="px-4 py-3 text-sm font-medium">
+                {{ $data['period'] }}
+            </td>
+            <td class="px-4 py-3 text-sm">
+                {{ $data['data_count'] }} records
+            </td>
+            @php $sensorIdx = 0; @endphp
+            @foreach($scheme->sensors as $sensor)
             @php
-    $globalIdx = array_search($data->id, array_column($processedData, 'id'));
-@endphp
-<tr class="text-gray-700 dark:text-gray-400 {{ ($selectedBarRecord === $globalIdx && ($dataAggregation === 'raw' && $showRawData)) ? 'bg-blue-50 dark:bg-blue-900' : '' }}">
-    <td class="px-2 py-3">
-        <button 
-            wire:click="selectBarRecordById('{{ $data->id }}')"
-            class="px-2 py-1 text-xs rounded {{ ($selectedBarRecord === $globalIdx && ($dataAggregation === 'raw' && $showRawData)) ? 'bg-blue-600 text-white ring-2 ring-blue-400' : 'bg-orange-100 text-gray-700 hover:bg-blue-100' }}"
-            title="Select this record for bar chart"
-        >
-            {{ ($selectedBarRecord === $globalIdx && ($dataAggregation === 'raw' && $showRawData)) ? 'Selected' : 'Select' }}
-        </button>
-    </td>
-                <td class="px-2 py-3 text-sm">
-                    {{ $data->created_at->format('Y-m-d H:i:s') }}
-                </td>
-                @php $sensorIdx = 0; @endphp
-                @foreach($scheme->sensors as $sensor)
-                @php
-                $outputs = $sensor->num_of_outputs ?: 1;
-                $jsonData = $data->json_content;
-                if (is_string($jsonData)) {
-                    $jsonData = json_decode($jsonData, true);
+            $outputs = $sensor->num_of_outputs ?: 1;
+            $outputLabels = explode(',', $sensor->output_labels ?? '');
+            $pivotAlias = $sensor->pivot->alias ?? null;
+            foreach ($data['sensors'] as $aggSensor) {
+                if (
+                $aggSensor['id'] == $sensor->id &&
+                (
+                (isset($aggSensor['alias']) && $aggSensor['alias'] == $pivotAlias) ||
+                (!isset($aggSensor['alias']) && !$pivotAlias)
+                )
+                ) {
+                    $sensorData = $aggSensor;
+                    break;
                 }
-                // Cari sensorData hanya berdasarkan id
-                $sensorData = null;
-                if (is_array($jsonData)) {
-                    foreach ($jsonData as $sensorJson) {
-                        if (isset($sensorJson['id']) && $sensorJson['id'] == $sensor->id) {
-                            $sensorData = $sensorJson;
-                            break;
-                        }
-                    }
-                }
-                // Get values array
-                $sensorValues = [];
-                if ($sensorData && isset($sensorData['values']) && is_array($sensorData['values'])) {
-                    foreach ($sensorData['values'] as $valueData) {
-                        // Support both array and associative array
-                        if (is_array($valueData) && isset($valueData['label'], $valueData['value'])) {
-                            $sensorValues[$valueData['label']] = $valueData['value'];
-                        } elseif (is_string($valueData)) {
-                            $sensorValues[$valueData] = $valueData;
-                        }
-                    }
-                }
-                // Parse output labels
-                $outputLabels = [];
-                if (isset($sensor->output_labels) && is_string($sensor->output_labels)) {
-                    $outputLabelsArray = explode(',', $sensor->output_labels);
-                    foreach ($outputLabelsArray as $i => $label) {
-                        $outputLabels[] = (object)['position' => $i, 'label' => trim($label)];
-                    }
-                } elseif (method_exists($sensor, 'outputLabels') && is_object($sensor->outputLabels())) {
-                    $outputLabels = $sensor->outputLabels()->get();
-                } elseif (isset($sensorData['values']) && is_array($sensorData['values'])) {
-                    foreach ($sensorData['values'] as $valueData) {
-                        $outputLabels[] = (object)['position' => 0, 'label' => $valueData['label']];
-                    }
+            }
+            @endphp
+            @for($i = 0; $i < $outputs; $i++)
+            @php
+            $label = isset($outputLabels[$i]) ? trim($outputLabels[$i]) : "Value " . ($i + 1);
+            $value = $sensorData && isset($sensorData['values'][$label])
+            ? $sensorData['values'][$label]
+            : '-';
+            $type = $sensorOutputTypes[$sensorIdx][$i] ?? 'number';
+            if (is_numeric($value)) {
+                if ($type === 'percentage') {
+                    $value = number_format($value * 100, 2) . '%';
                 } else {
-                    for ($i = 0; $i < $outputs; $i++) {
-                        $outputLabels[] = (object)['position' => $i, 'label' => "Value " . ($i + 1)];
-                    }
+                    $value = number_format($value, 2);
                 }
-                @endphp
-                @foreach($outputLabels as $i => $outputLabel)
-                @php
-                $value = $sensorValues[$outputLabel->label] ?? '-';
-                $type = $sensorOutputTypes[$sensorIdx][$i] ?? 'number';
-                if (is_numeric($value)) {
-                    if ($type === 'percentage') {
-                        $value = number_format($value * 100, 2) . '%';
-                    } else {
-                        $value = number_format($value, 2);
-                    }
-                }
-                @endphp
-                <td class="px-4 py-3 text-sm">
-                    {{ $value }}
-                </td>
-                @endforeach
-                @php $sensorIdx++; @endphp
-                @endforeach
-                
-                @if(is_array($scheme->additional_columns) && count($scheme->additional_columns) > 0)
-                @foreach($scheme->additional_columns as $column)
-                <td class="px-4 py-3 text-sm">
-                    @php
-                    $additionalValue = '-';
-                    $additionalData = $data->additional_content;
-                    if (is_array($additionalData) && isset($additionalData[$column['name']])) {
-                        $additionalValue = $additionalData[$column['name']];
-                        if ($column['data_type'] == 'date' && $additionalValue != '-') {
-                            $additionalValue = \Carbon\Carbon::parse($additionalValue)->format('Y-m-d');
-                        } elseif ($column['data_type'] == 'boolean' && $additionalValue != '-') {
-                            $additionalValue = filter_var($additionalValue, FILTER_VALIDATE_BOOLEAN) ? 'Yes' : 'No';
-                        }
-                    }
-                    @endphp
-                    {{ $additionalValue }}
-                </td>
-                @endforeach
-                @endif
-            </tr>
-            @empty
-            <tr>
-                <td colspan="{{ $scheme->sensors->sum(function($s) { return $s->num_of_outputs ?: 1; }) + count($scheme->additional_columns ?? []) + 1 }}" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400">
-                    No data available for the selected time range.
-                </td>
-            </tr>
-            @endforelse
+            }
+            @endphp
+            <td class="px-4 py-3 text-sm">
+                {{ $value }}
+            </td>
+            @endfor
+            @php $sensorIdx++; @endphp
+            @endforeach
+            
+            @if(is_array($scheme->additional_columns) && count($scheme->additional_columns) > 0)
+            @foreach($scheme->additional_columns as $column)
+            <td class="px-4 py-3 text-sm">-</td>
+            @endforeach
             @endif
-        </tbody>
-    </table>
+        </tr>
+        @empty
+        <tr>
+            <td colspan="{{ $scheme->sensors->sum(function($s) { return $s->num_of_outputs ?: 1; }) + count($scheme->additional_columns ?? []) + 2 }}" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400">
+                No aggregated data available for the selected time range.
+            </td>
+        </tr>
+        @endforelse
+        @else
+        {{-- Display raw data --}}
+        @forelse($paginatedData as $idx => $data)
+        @php
+        $globalIdx = array_search($data->id, array_column($processedData, 'id'));
+        @endphp
+        <tr class="text-gray-700 dark:text-gray-400 {{ ($selectedBarRecord === $globalIdx && ($dataAggregation === 'raw' && $showRawData)) ? 'bg-blue-50 dark:bg-blue-900' : '' }}">
+            <td class="px-2 py-3">
+                <button 
+                wire:click="selectBarRecordById('{{ $data->id }}')"
+                class="px-2 py-1 text-xs rounded {{ ($selectedBarRecord === $globalIdx && ($dataAggregation === 'raw' && $showRawData)) ? 'bg-blue-600 text-white ring-2 ring-blue-400' : 'bg-orange-100 text-gray-700 hover:bg-blue-100' }}"
+                title="Select this record for bar chart"
+                >
+                {{ ($selectedBarRecord === $globalIdx && ($dataAggregation === 'raw' && $showRawData)) ? 'Selected' : 'Select' }}
+            </button>
+        </td>
+        <td class="px-2 py-3 text-sm">
+            {{ $data->created_at->format('Y-m-d H:i:s') }}
+        </td>
+        @php $sensorIdx = 0; @endphp
+        @foreach($scheme->sensors as $sensor)
+        @php
+        $outputs = $sensor->num_of_outputs ?: 1;
+        $jsonData = $data->json_content;
+        if (is_string($jsonData)) {
+            $jsonData = json_decode($jsonData, true);
+        }
+        $pivotAlias = $sensor->pivot->alias ?? null;
+        $sensorData = null;
+        if (is_array($jsonData)) {
+            foreach ($jsonData as $sensorJson) {
+                if (
+                isset($sensorJson['id']) && $sensorJson['id'] == $sensor->id &&
+                (
+                (isset($sensorJson['alias']) && $sensorJson['alias'] == $pivotAlias) ||
+                (!isset($sensorJson['alias']) && !$pivotAlias)
+                )
+                ) {
+                    $sensorData = $sensorJson;
+                    break;
+                }
+            }
+        }
+        // Get values array
+        $sensorValues = [];
+        if ($sensorData && isset($sensorData['values']) && is_array($sensorData['values'])) {
+            foreach ($sensorData['values'] as $valueData) {
+                // Support both array and associative array
+                if (is_array($valueData) && isset($valueData['label'], $valueData['value'])) {
+                    $sensorValues[$valueData['label']] = $valueData['value'];
+                } elseif (is_string($valueData)) {
+                    $sensorValues[$valueData] = $valueData;
+                }
+            }
+        }
+        // Parse output labels
+        $outputLabels = [];
+        if (isset($sensor->output_labels) && is_string($sensor->output_labels)) {
+            $outputLabelsArray = explode(',', $sensor->output_labels);
+            foreach ($outputLabelsArray as $i => $label) {
+                $outputLabels[] = (object)['position' => $i, 'label' => trim($label)];
+            }
+        } elseif (method_exists($sensor, 'outputLabels') && is_object($sensor->outputLabels())) {
+            $outputLabels = $sensor->outputLabels()->get();
+        } elseif (isset($sensorData['values']) && is_array($sensorData['values'])) {
+            foreach ($sensorData['values'] as $valueData) {
+                $outputLabels[] = (object)['position' => 0, 'label' => $valueData['label']];
+            }
+        } else {
+            for ($i = 0; $i < $outputs; $i++) {
+                $outputLabels[] = (object)['position' => $i, 'label' => "Value " . ($i + 1)];
+            }
+        }
+        @endphp
+        @foreach($outputLabels as $i => $outputLabel)
+        @php
+        $value = $sensorValues[$outputLabel->label] ?? '-';
+        $type = $sensorOutputTypes[$sensorIdx][$i] ?? 'number';
+        if (is_numeric($value)) {
+            if ($type === 'percentage') {
+                $value = number_format($value * 100, 2) . '%';
+            } else {
+                $value = number_format($value, 2);
+            }
+        }
+        @endphp
+        <td class="px-4 py-3 text-sm">
+            {{ $value }}
+        </td>
+        @endforeach
+        @php $sensorIdx++; @endphp
+        @endforeach
+        
+        @if(is_array($scheme->additional_columns) && count($scheme->additional_columns) > 0)
+        @foreach($scheme->additional_columns as $column)
+        <td class="px-4 py-3 text-sm">
+            @php
+            $additionalValue = '-';
+            $additionalData = $data->additional_content;
+            if (is_array($additionalData) && isset($additionalData[$column['name']])) {
+                $additionalValue = $additionalData[$column['name']];
+                if ($column['data_type'] == 'date' && $additionalValue != '-') {
+                    $additionalValue = \Carbon\Carbon::parse($additionalValue)->format('Y-m-d');
+                } elseif ($column['data_type'] == 'boolean' && $additionalValue != '-') {
+                    $additionalValue = filter_var($additionalValue, FILTER_VALIDATE_BOOLEAN) ? 'Yes' : 'No';
+                }
+            }
+            @endphp
+            {{ $additionalValue }}
+        </td>
+        @endforeach
+        @endif
+    </tr>
+    @empty
+    <tr>
+        <td colspan="{{ $scheme->sensors->sum(function($s) { return $s->num_of_outputs ?: 1; }) + count($scheme->additional_columns ?? []) + 1 }}" class="px-4 py-3 text-center text-gray-500 dark:text-gray-400">
+            No data available for the selected time range.
+        </td>
+    </tr>
+    @endforelse
+    @endif
+</tbody>
+</table>
 </div>
 
 <!-- Pagination -->
@@ -524,12 +535,12 @@
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
 <script>
     let selectedBarRecord = null;
-
+    
     Livewire.on('bar-record-selected', (idx) => {
         selectedBarRecord = idx;
         renderBarChart(currentProcessedData, currentScheme, selectedBarRecord);
     });
-
+    
     function renderBarChart(processedData, scheme, selectedIdx = null){
         // Ambil validation_settings dari setiap sensor
         let sensorOutputTypes = [];
@@ -691,11 +702,11 @@
             chart.resize();
         });
     }
-   
+    
     document.addEventListener('DOMContentLoaded', function() {
         renderBarChart(@json($processedData), @json($scheme));
     });
-        let autoRefreshInterval;
+    let autoRefreshInterval;
     let lastBarDataTimestamp = null;
     let currentProcessedData = @js($processedData);
     let currentScheme = @json($scheme);
@@ -786,7 +797,7 @@
     if (@js($autoRefresh)) {
         startAutoRefresh(@js($refreshInterval));
     }   
-        Livewire.on('data-refreshed', (event) => {
+    Livewire.on('data-refreshed', (event) => {
         updateLastUpdatedTime();
         // Debug info
         let hasNewData = false;
@@ -801,11 +812,11 @@
         let processedData = event.processedData;
         let scheme = event.scheme;
         if (!processedData || processedData.length === 0) return;
-    
+        
         // Cek timestamp data terakhir
         const latest = processedData[processedData.length - 1];
         const latestTimestamp = latest.created_at || latest.timestamp || null;
-    
+        
         // Hanya update jika data terbaru berubah
         if (latestTimestamp !== lastBarDataTimestamp) {
             lastBarDataTimestamp = latestTimestamp;

@@ -330,22 +330,28 @@
                                 <td class="px-4 py-3 text-sm">
                                     {{ $data['data_count'] }} records
                                 </td>
-                                
+
                                 @foreach($scheme->sensors as $sensor)
                                     @php
                                         $outputs = $sensor->num_of_outputs ?: 1;
                                         $outputLabels = explode(',', $sensor->output_labels ?? '');
-                                        
+
                                         // Find sensor data in aggregated data
-                                        $sensorData = null;
+                                        $pivotAlias = $sensor->pivot->alias ?? null;
                                         foreach ($data['sensors'] as $aggSensor) {
-                                            if ($aggSensor['id'] == $sensor->id) {
+                                            if (
+                                                $aggSensor['id'] == $sensor->id &&
+                                                (
+                                                    (isset($aggSensor['alias']) && $aggSensor['alias'] == $pivotAlias) ||
+                                                    (!isset($aggSensor['alias']) && !$pivotAlias)
+                                                )
+                                            ) {
                                                 $sensorData = $aggSensor;
                                                 break;
                                             }
                                         }
                                     @endphp
-                                    
+
                                     @for($i = 0; $i < $outputs; $i++)
                                         @php
                                             $label = isset($outputLabels[$i]) ? trim($outputLabels[$i]) : "Value " . ($i + 1);
@@ -364,7 +370,7 @@
                                         </td>
                                     @endfor
                                 @endforeach
-                                
+
                                 @if(is_array($scheme->additional_columns) && count($scheme->additional_columns) > 0)
                                     @foreach($scheme->additional_columns as $column)
                                         <td class="px-4 py-3 text-sm">-</td>
@@ -388,53 +394,60 @@
                                 @php $sensorIdx = 0; @endphp
                                 @foreach($scheme->sensors as $sensor)
                                     @php
-                                        $outputs = $sensor->num_of_outputs ?: 1;
-                                        
-                                        // Parse the JSON content
-                                        $jsonData = $data->json_content;
-                                        if (is_string($jsonData)) {
-                                            $jsonData = json_decode($jsonData, true);
-                                        }
-                                        
-                                        // Find sensor data - MODIFIED TO CHECK BOTH ID AND ALIAS
-                                        $sensorData = null;
-                                        if (is_array($jsonData)) {
-                                            foreach ($jsonData as $sensorJson) {
-                                                if (isset($sensorJson['id']) && $sensorJson['id'] == $sensor->id) {
-                                                    $sensorData = $sensorJson;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        
-                                        // Get values array
-                                        $sensorValues = [];
-                                        if ($sensorData && isset($sensorData['values']) && is_array($sensorData['values'])) {
-                                            foreach ($sensorData['values'] as $valueData) {
-                                                $sensorValues[$valueData['label']] = $valueData['value'];
-                                            }
-                                        }
-                                        
-                                        // Parse output labels
-                                        $outputLabels = [];
-                                        if (isset($sensor->output_labels) && is_string($sensor->output_labels)) {
-                                            $outputLabelsArray = explode(',', $sensor->output_labels);
-                                            foreach ($outputLabelsArray as $i => $label) {
-                                                $outputLabels[] = (object)['position' => $i, 'label' => trim($label)];
-                                            }
-                                        } elseif (method_exists($sensor, 'outputLabels') && is_object($sensor->outputLabels())) {
-                                            $outputLabels = $sensor->outputLabels()->get();
-                                        } elseif (isset($sensorData['values']) && is_array($sensorData['values'])) {
-                                            foreach ($sensorData['values'] as $valueData) {
-                                                $outputLabels[] = (object)['position' => 0, 'label' => $valueData['label']];
-                                            }
-                                        } else {
-                                            for ($i = 0; $i < $outputs; $i++) {
-                                                $outputLabels[] = (object)['position' => $i, 'label' => "Value " . ($i + 1)];
-                                            }
-                                        }
+                                                        $outputs = $sensor->num_of_outputs ?: 1;
+
+                                                        // Parse the JSON content
+                                                        $jsonData = $data->json_content;
+                                                        if (is_string($jsonData)) {
+                                                            $jsonData = json_decode($jsonData, true);
+                                                        }
+                                                        
+                                                        // Find sensor data - MODIFIED TO CHECK BOTH ID AND ALIAS
+                                                        $pivotAlias = $sensor->pivot->alias ?? null;
+                                                        $sensorData = null;
+                                                        if (is_array($jsonData)) {
+                                                            foreach ($jsonData as $sensorJson) {
+                                                                if (
+                                                                isset($sensorJson['id']) && $sensorJson['id'] == $sensor->id &&
+                                                                (
+                                                                (isset($sensorJson['alias']) && $sensorJson['alias'] == $pivotAlias) ||
+                                                                (!isset($sensorJson['alias']) && !$pivotAlias)
+                                                                )
+                                                                ) {
+                                                                    $sensorData = $sensorJson;
+                                                                    break;
+                                                                }
+                                                            }
+                                                        }
+
+                                                        // Get values array
+                                                        $sensorValues = [];
+                                                        if ($sensorData && isset($sensorData['values']) && is_array($sensorData['values'])) {
+                                                            foreach ($sensorData['values'] as $valueData) {
+                                                                $sensorValues[$valueData['label']] = $valueData['value'];
+                                                            }
+                                                        }
+
+                                                        // Parse output labels
+                                                        $outputLabels = [];
+                                                        if (isset($sensor->output_labels) && is_string($sensor->output_labels)) {
+                                                            $outputLabelsArray = explode(',', $sensor->output_labels);
+                                                            foreach ($outputLabelsArray as $i => $label) {
+                                                                $outputLabels[] = (object)['position' => $i, 'label' => trim($label)];
+                                                            }
+                                                        } elseif (method_exists($sensor, 'outputLabels') && is_object($sensor->outputLabels())) {
+                                                            $outputLabels = $sensor->outputLabels()->get();
+                                                        } elseif (isset($sensorData['values']) && is_array($sensorData['values'])) {
+                                                            foreach ($sensorData['values'] as $valueData) {
+                                                                $outputLabels[] = (object)['position' => 0, 'label' => $valueData['label']];
+                                                            }
+                                                        } else {
+                                                            for ($i = 0; $i < $outputs; $i++) {
+                                                                $outputLabels[] = (object)['position' => $i, 'label' => "Value " . ($i + 1)];
+                                                            }
+                                                        }
                                     @endphp
-                                    
+
                                     @foreach($outputLabels as $i => $outputLabel)
                                         <td class="px-4 py-3 text-sm">
                                             @php
@@ -452,7 +465,7 @@
                                         </td>
                                     @endforeach
                                 @endforeach
-                                
+
                                 @if(is_array($scheme->additional_columns) && count($scheme->additional_columns) > 0)
                                     @foreach($scheme->additional_columns as $column)
                                         <td class="px-4 py-3 text-sm">
@@ -460,10 +473,10 @@
                                                 // Safely access the additional_content data
                                                 $additionalValue = '-';
                                                 $additionalData = $data->additional_content;
-                                                
+
                                                 if (is_array($additionalData) && isset($additionalData[$column['name']])) {
                                                     $additionalValue = $additionalData[$column['name']];
-                                                    
+
                                                     // Format the value based on data type if needed
                                                     if ($column['data_type'] == 'date' && $additionalValue != '-') {
                                                         $additionalValue = \Carbon\Carbon::parse($additionalValue)->format('Y-m-d');

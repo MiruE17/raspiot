@@ -328,10 +328,15 @@
                 @php
                 $outputs = $sensor->num_of_outputs ?: 1;
                 $outputLabels = explode(',', $sensor->output_labels ?? '');
-                // Cari sensorData hanya berdasarkan id
-                $sensorData = null;
+                $pivotAlias = $sensor->pivot->alias ?? null;
                 foreach ($data['sensors'] as $aggSensor) {
-                    if ($aggSensor['id'] == $sensor->id) {
+                    if (
+                    $aggSensor['id'] == $sensor->id &&
+                    (
+                    (isset($aggSensor['alias']) && $aggSensor['alias'] == $pivotAlias) ||
+                    (!isset($aggSensor['alias']) && !$pivotAlias)
+                    )
+                    ) {
                         $sensorData = $aggSensor;
                         break;
                     }
@@ -387,11 +392,17 @@
                 if (is_string($jsonData)) {
                     $jsonData = json_decode($jsonData, true);
                 }
-                // Cari sensorData hanya berdasarkan id
+                $pivotAlias = $sensor->pivot->alias ?? null;
                 $sensorData = null;
                 if (is_array($jsonData)) {
                     foreach ($jsonData as $sensorJson) {
-                        if (isset($sensorJson['id']) && $sensorJson['id'] == $sensor->id) {
+                        if (
+                        isset($sensorJson['id']) && $sensorJson['id'] == $sensor->id &&
+                        (
+                        (isset($sensorJson['alias']) && $sensorJson['alias'] == $pivotAlias) ||
+                        (!isset($sensorJson['alias']) && !$pivotAlias)
+                        )
+                        ) {
                             $sensorData = $sensorJson;
                             break;
                         }
@@ -644,11 +655,11 @@
             chart.resize();
         });
     }
-   
+    
     document.addEventListener('DOMContentLoaded', function() {
         renderBarChart(@json($processedData), @json($scheme));
     });
-        let autoRefreshInterval;
+    let autoRefreshInterval;
     let lastBarDataTimestamp = null;
     let currentProcessedData = @js($processedData);
     let currentScheme = @json($scheme);
@@ -739,7 +750,7 @@
     if (@js($autoRefresh)) {
         startAutoRefresh(@js($refreshInterval));
     }   
-        Livewire.on('data-refreshed', (event) => {
+    Livewire.on('data-refreshed', (event) => {
         updateLastUpdatedTime();
         // Debug info
         let hasNewData = false;
@@ -754,11 +765,11 @@
         let processedData = event.processedData;
         let scheme = event.scheme;
         if (!processedData || processedData.length === 0) return;
-    
+        
         // Cek timestamp data terakhir
         const latest = processedData[processedData.length - 1];
         const latestTimestamp = latest.created_at || latest.timestamp || null;
-    
+        
         // Hanya update jika data terbaru berubah
         if (latestTimestamp !== lastBarDataTimestamp) {
             lastBarDataTimestamp = latestTimestamp;
